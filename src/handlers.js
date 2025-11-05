@@ -296,8 +296,8 @@ async function generateWithOpenAI(systemPrompt, userPrompt, apiKey, env) {
 async function generateWithGemini(systemPrompt, userPrompt, apiKey, env) {
   try {
     // Obtener modelo SOLO desde KV (Panel Web) - Sin fallback a variables de entorno
-    const model = await env.FB_PUBLISHER_KV.get('AI_MODEL') || 'gemini-2.5-flash';
-    const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+    const model = await env.FB_PUBLISHER_KV.get('AI_MODEL') || 'models/gemini-2.5-flash';
+    const apiUrl = `https://generativelanguage.googleapis.com/v1beta/${model}:generateContent?key=${apiKey}`;
     
     // Gemini usa un formato diferente: combinar system y user prompt
     const fullPrompt = `${systemPrompt}\n\n${userPrompt}`;
@@ -627,7 +627,7 @@ export async function handleGetSettings(env, corsHeaders) {
     // Determinar modelo por defecto según proveedor si no está configurado
     let defaultModel = 'gpt-3.5-turbo';
     if (aiProvider === 'gemini') {
-      defaultModel = 'gemini-2.5-flash';
+      defaultModel = 'models/gemini-2.5-flash';
     } else if (aiProvider === 'openai') {
       defaultModel = 'gpt-3.5-turbo';
     }

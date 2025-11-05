@@ -1200,10 +1200,11 @@ function updateModelOptions() {
         });
     } else if (provider === 'gemini') {
         const models = [
-            { value: 'gemini-pro', label: 'Gemini Pro (Gratis)', features: '60 req/min' },
-            { value: 'gemini-1.5-pro', label: 'Gemini 1.5 Pro (Gratis)', features: '2 req/min' },
-            { value: 'gemini-1.5-flash', label: 'Gemini 1.5 Flash (Gratis, más rápido)', features: '15 req/min' },
-            { value: 'gemini-2.0-flash-exp', label: 'Gemini 2.0 Flash Experimental (Gratis)', features: '10 req/min' }
+            { value: 'models/gemini-2.5-flash', label: 'Gemini 2.5 Flash (Recomendado)', features: 'Rápido y eficiente' },
+            { value: 'models/gemini-2.5-pro', label: 'Gemini 2.5 Pro', features: 'Máxima calidad' },
+            { value: 'models/gemini-2.0-flash', label: 'Gemini 2.0 Flash', features: 'Estable y rápido' },
+            { value: 'models/gemini-2.0-flash-exp', label: 'Gemini 2.0 Flash Experimental', features: 'Últimas características' },
+            { value: 'models/gemini-flash-latest', label: 'Gemini Flash Latest', features: 'Siempre actualizado' }
         ];
         
         models.forEach(model => {
