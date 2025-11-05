@@ -211,12 +211,22 @@ async function handleGetProjects(env, corsHeaders) {
 async function handleCreateProject(request, env, corsHeaders) {
   const data = await request.json();
   
+  // Limpiar URLs si existen
+  let cleanUrls = [];
+  if (data.urls && Array.isArray(data.urls)) {
+    cleanUrls = data.urls
+      .map(url => (url || '').toString().trim())    // Convertir a string y limpiar
+      .map(url => url.replace(/\s+/g, ''))          // Eliminar TODOS los espacios
+      .filter(url => url.length > 0)                // Eliminar vacíos
+      .filter(url => url.startsWith('http'));       // Solo URLs válidas
+  }
+  
   const newProject = {
     id: generateId(),
     name: data.name,
     domain: data.domain,
     description: data.description || '',
-    urls: data.urls || [], // Array de URLs del proyecto
+    urls: cleanUrls, // URLs limpias
     fbPageId: data.fbPageId || env.FB_PAGE_ID,
     active: true,
     createdAt: new Date().toISOString(),
@@ -267,6 +277,16 @@ async function handleGetProject(projectId, env, corsHeaders) {
 
 async function handleUpdateProject(projectId, request, env, corsHeaders) {
   const data = await request.json();
+  
+  // Limpiar URLs si vienen en la actualización
+  if (data.urls && Array.isArray(data.urls)) {
+    data.urls = data.urls
+      .map(url => (url || '').toString().trim())    // Convertir a string y limpiar
+      .map(url => url.replace(/\s+/g, ''))          // Eliminar TODOS los espacios
+      .filter(url => url.length > 0)                // Eliminar vacíos
+      .filter(url => url.startsWith('http'));       // Solo URLs válidas
+  }
+  
   const projects = await env.FB_PUBLISHER_KV.get('projects', { type: 'json' }) || { projects: [] };
   const projectIndex = projects.projects.findIndex(p => p.id === projectId);
   

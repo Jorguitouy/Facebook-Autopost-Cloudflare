@@ -232,12 +232,15 @@ async function createProject() {
         return;
     }
     
-    // Procesar URLs (una por línea)
+    // Procesar URLs (una por línea) - Limpieza exhaustiva
     let urls = [];
     if (urlsText) {
-        urls = urlsText.split('\n')
-            .map(url => url.trim())
-            .filter(url => url && url.startsWith('http'));
+        urls = urlsText
+            .split('\n')                           // Dividir por líneas
+            .map(url => url.trim())                // Eliminar espacios al inicio/final
+            .map(url => url.replace(/\s+/g, ''))   // Eliminar TODOS los espacios en medio
+            .filter(url => url.length > 0)         // Eliminar líneas vacías
+            .filter(url => url.startsWith('http')); // Solo URLs válidas
         
         if (urls.length === 0) {
             showMessage('⚠️ No se encontraron URLs válidas. Asegúrate de que empiecen con http:// o https://', 'error');
@@ -320,12 +323,15 @@ async function saveEditProject() {
         return;
     }
     
-    // Procesar URLs
+    // Procesar URLs - Limpieza exhaustiva
     let urls = [];
     if (urlsText) {
-        urls = urlsText.split('\n')
-            .map(url => url.trim())
-            .filter(url => url && url.startsWith('http'));
+        urls = urlsText
+            .split('\n')                           // Dividir por líneas
+            .map(url => url.trim())                // Eliminar espacios al inicio/final
+            .map(url => url.replace(/\s+/g, ''))   // Eliminar TODOS los espacios en medio
+            .filter(url => url.length > 0)         // Eliminar líneas vacías
+            .filter(url => url.startsWith('http')); // Solo URLs válidas
         
         if (urls.length > 500) {
             showMessage('⚠️ Máximo 500 URLs por proyecto. Tienes ' + urls.length, 'error');
