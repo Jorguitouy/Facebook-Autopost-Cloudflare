@@ -16,6 +16,7 @@ import {
   handleDeleteProjectPost,
   handleGenerateContent,
   handleGenerateBulkContent,
+  handleGenerateAllProjectPosts,
   handlePublishProjectPost,
   handleManualPublish,
   handleGetStats,
@@ -120,6 +121,12 @@ export default {
       if (url.pathname.match(/^\/api\/projects\/[^/]+\/posts\/bulk$/) && request.method === 'POST') {
         const projectId = url.pathname.split('/')[3];
         return handleBulkAddProjectPosts(projectId, request, env, corsHeaders);
+      }
+      
+      // Generar posts con IA para TODAS las URLs del proyecto
+      if (url.pathname.match(/^\/api\/projects\/[^/]+\/generate-all-posts$/) && request.method === 'POST') {
+        const projectId = url.pathname.split('/')[3];
+        return handleGenerateAllProjectPosts(projectId, env, corsHeaders);
       }
 
       if (url.pathname.match(/^\/api\/projects\/[^/]+\/posts\/[^/]+$/) && request.method === 'DELETE') {

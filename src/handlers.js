@@ -724,3 +724,112 @@ export async function handleSaveSettings(request, env, corsHeaders) {
     });
   }
 }
+
+/**
+ * POST /api/projects/:id/generate-all-posts
+ * Genera contenido con IA para TODAS las URLs del proyecto que aún no tienen posts
+ */
+export async function handleGenerateAllProjectPosts(projectId, env, corsHeaders) {
+  try {
+    // Verificar si hay API key configurada
+    const aiApiKey = await env.FB_PUBLISHER_KV.get('AI_API_KEY') || env.OPENAI_API_KEY;
+    if (!aiApiKey) {
+      return new Response(JSON.stringify({ 
+        success: false,
+        error: 'API Key de IA no configurada. Configúrala en el panel de Configuración.' 
+      }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
+
+    // Obtener el proyecto
+    const projectsData = await env.FB_PUBLISHER_KV.get('projects', { type: 'json' }) || { projects: [] };
+    const project = projectsData.projects.find(p => p.id === projectId);
+    
+    if (!project) {
+      return new Response(JSON.stringify({ 
+        success: false,
+        error: 'Proyecto no encontrado' 
+      }), {
+        status: 404,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
+
+    // Obtener posts existentes
+    const projectPosts = await env.FB_PUBLISHER_KV.get(`project:${projectId}:posts`, { type: 'json' }) || { posts: [] };
+    const existingUrls = new Set(projectPosts.posts.map(p => p.url));
+    
+    // Obtener URLs del proyecto que aún no tienen posts
+    const urlsToProcess = (project.urls || []).filter(url => !existingUrls.has(url));
+    
+    if (urlsToProcess.length === 0) {
+      return new Response(JSON.stringify({ 
+        success: true,
+        message: 'Todas las URLs ya tienen posts generados',
+        processed: 0,
+        skipped: project.urls?.length || 0
+      }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
+
+    // Procesar en lotes de 50 URLs para evitar timeouts
+    const BATCH_SIZE = 50;
+    const urlBatch = urlsToProcess.slice(0, BATCH_SIZE);
+    const newPosts = [];
+    const errors = [];
+
+    for (const url of urlBatch) {
+      try {
+        const content = await generateContentFromURL(url, `Contenido del sitio ${project.name}`, env);
+        newPosts.push({
+          id: generateId(),
+          url: url,
+          message: content.message,
+          title: content.title || '',
+          status: 'pending',
+          createdAt: new Date().toISOString(),
+          aiGenerated: true
+        });
+      } catch (error) {
+        errors.push({
+          url: url,
+          error: error.message
+        });
+      }
+    }
+
+    // Guardar los nuevos posts
+    if (newPosts.length > 0) {
+      projectPosts.posts.push(...newPosts);
+      await env.FB_PUBLISHER_KV.put(`project:${projectId}:posts`, JSON.stringify(projectPosts));
+      
+      // Actualizar estadísticas
+      for (let i = 0; i < newPosts.length; i++) {
+        await updateProjectStats(projectId, env, 'add');
+      }
+    }
+
+    return new Response(JSON.stringify({ 
+      success: true,
+      processed: newPosts.length,
+      errors: errors.length,
+      remaining: urlsToProcess.length - BATCH_SIZE > 0 ? urlsToProcess.length - BATCH_SIZE : 0,
+      totalUrls: project.urls?.length || 0,
+      errorDetails: errors.length > 0 ? errors : undefined
+    }), {
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    });
+
+  } catch (error) {
+    return new Response(JSON.stringify({ 
+      success: false,
+      error: error.message 
+    }), {
+      status: 500,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    });
+  }
+}

@@ -162,10 +162,15 @@ function renderProjects() {
                     <div class="project-stat-value">${project.stats?.publishedPosts || 0}</div>
                     <div class="project-stat-label">Publicado</div>
                 </div>
+                <div class="project-stat">
+                    <div class="project-stat-value">${project.urls?.length || 0}</div>
+                    <div class="project-stat-label">URLs</div>
+                </div>
             </div>
             
             <div class="project-actions">
                 <button class="success" onclick="viewProjectPosts('${project.id}')">📝 Posts</button>
+                <button class="primary" onclick="generateAllPosts('${project.id}')" title="Generar contenido con IA para todas las URLs">🤖 IA Auto</button>
                 <button onclick="editProject('${project.id}')">✏️ Editar</button>
                 <button class="danger" onclick="deleteProject('${project.id}')">🗑️</button>
             </div>
@@ -330,6 +335,55 @@ async function deleteProject(projectId) {
             await loadStats();
         } else {
             showMessage('❌ Error al eliminar proyecto', 'error');
+        }
+    } catch (error) {
+        showMessage('❌ Error: ' + error.message, 'error');
+    }
+}
+
+async function generateAllPosts(projectId) {
+    const project = projects.find(p => p.id === projectId);
+    if (!project) return;
+    
+    const urlCount = project.urls?.length || 0;
+    const existingPosts = project.stats?.totalPosts || 0;
+    const remaining = urlCount - existingPosts;
+    
+    if (remaining <= 0) {
+        alert(`El proyecto "${project.name}" ya tiene posts para todas sus URLs (${urlCount} URLs)`);
+        return;
+    }
+    
+    if (!confirm(`Generar contenido con IA para "${project.name}"?\n\n` +
+                 `📊 URLs totales: ${urlCount}\n` +
+                 `✅ Ya procesadas: ${existingPosts}\n` +
+                 `⏳ Por procesar: ${remaining}\n\n` +
+                 `Se procesarán hasta 50 URLs por vez.\n` +
+                 `Esto puede tardar varios minutos.`)) {
+        return;
+    }
+    
+    try {
+        showMessage('🤖 Generando contenido con IA...', 'info');
+        
+        const response = await fetch(`/api/projects/${projectId}/generate-all-posts`, {
+            method: 'POST'
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+            const message = `✅ Generación completada!\n\n` +
+                          `✨ Procesadas: ${result.processed}\n` +
+                          `❌ Errores: ${result.errors}\n` +
+                          (result.remaining > 0 ? `⏳ Restantes: ${result.remaining}\n\n` +
+                           `Ejecuta nuevamente para procesar las restantes.` : '');
+            
+            showMessage(message.replace(/\n/g, '<br>'), 'success');
+            await loadProjects();
+            await loadStats();
+        } else {
+            showMessage('❌ ' + result.error, 'error');
         }
     } catch (error) {
         showMessage('❌ Error: ' + error.message, 'error');
