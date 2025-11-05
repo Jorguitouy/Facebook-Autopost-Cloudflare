@@ -2,7 +2,24 @@ node_modules/
 .wrangler/
 .dev.vars
 .env
+.env.local
+.env.production
 *.log
 .DS_Store
 dist/
 urls.json
+
+# Scripts de prueba con API Keys
+test-api.ps1
+test-gemini.ps1
+test-gemini-simple.ps1
+*-test.ps1
+
+# Archivos de configuración con credenciales
+config.json
+secrets.json
+credentials.json
+
+# Backups que puedan contener datos sensibles
+*.backup
+*.bak
