@@ -216,60 +216,107 @@
             <div class="card">
                 <div class="card-header">
                     <h2>⚙️ Configuración del Sistema</h2>
+                    <button onclick="loadSettings()">🔄 Recargar</button>
                 </div>
                 
                 <div class="message info">
                     <span>ℹ️</span>
                     <div>
-                        <strong>Configuración de Credenciales</strong><br>
-                        Las credenciales de Facebook y OpenAI se configuran mediante Wrangler Secrets.<br>
-                        Ejecuta: <code>npx wrangler secret put FB_PAGE_ACCESS_TOKEN</code>
+                        <strong>Configuración Dinámica</strong><br>
+                        Puedes configurar las credenciales directamente desde este panel. Los cambios se guardan en Cloudflare KV y son aplicados inmediatamente.
                     </div>
                 </div>
                 
-                <h3 class="mb-2">📘 Facebook</h3>
+                <h3 class="mb-2">🔑 Clave de Administrador</h3>
                 <p class="text-gray text-small mb-3">
-                    Para configurar las credenciales de Facebook, necesitas crear una app en 
-                    <a href="https://developers.facebook.com/" target="_blank">Facebook Developers</a>
-                    y obtener un token de acceso de página.
+                    Para guardar la configuración necesitas la clave de administrador. Configúrala primero con:
+                    <code>npx wrangler secret put ADMIN_KEY</code>
                 </p>
                 
                 <div class="form-group">
-                    <label>Comandos para configurar:</label>
-                    <textarea readonly rows="3">npx wrangler secret put FB_PAGE_ACCESS_TOKEN
-npx wrangler secret put FB_PAGE_ID</textarea>
+                    <label>Clave de Administrador *</label>
+                    <input type="password" id="adminKey" placeholder="Ingresa la clave de administrador">
+                    <small>Esta clave solo se usa para autenticar cambios, no se guarda en el navegador</small>
                 </div>
                 
-                <h3 class="mb-2 mt-3">🤖 OpenAI</h3>
+                <h3 class="mb-2 mt-3">🤖 Proveedor de IA</h3>
                 <p class="text-gray text-small mb-3">
-                    Para usar la generación de contenido con IA, necesitas una API Key de OpenAI.
-                    Obtén una en <a href="https://platform.openai.com/api-keys" target="_blank">OpenAI Platform</a>.
+                    Selecciona el proveedor de IA que deseas usar para generar contenido automático.
                 </p>
                 
                 <div class="form-group">
-                    <label>Comando para configurar:</label>
-                    <textarea readonly rows="1">npx wrangler secret put OPENAI_API_KEY</textarea>
+                    <label>Proveedor</label>
+                    <select id="aiProvider">
+                        <option value="openai">OpenAI (GPT-3.5 / GPT-4)</option>
+                        <option value="gemini">Google Gemini</option>
+                    </select>
+                </div>
+                
+                <div class="form-group">
+                    <label>API Key del Proveedor de IA</label>
+                    <input type="password" id="aiApiKey" placeholder="sk-... o AIza...">
+                    <small id="aiApiKeyStatus">No configurada</small>
+                </div>
+                
+                <div id="aiProviderInfo" class="message info" style="display:none; margin-top: 12px;">
+                    <span>📖</span>
+                    <div id="aiProviderInfoText"></div>
+                </div>
+                
+                <h3 class="mb-2 mt-3">📘 Facebook</h3>
+                <p class="text-gray text-small mb-3">
+                    Credenciales para publicar en tu fanpage. Consulta 
+                    <a href="https://github.com/Jorguitouy/Facebook-Autopost-Cloudflare/blob/master/GUIA-AUTORIZACION-FACEBOOK.md" target="_blank">GUIA-AUTORIZACION-FACEBOOK.md</a>
+                    para obtenerlas.
+                </p>
+                
+                <div class="form-group">
+                    <label>Page ID</label>
+                    <input type="text" id="fbPageId" placeholder="123456789012345">
+                    <small id="fbPageIdStatus">No configurado</small>
+                </div>
+                
+                <div class="form-group">
+                    <label>Page Access Token</label>
+                    <input type="password" id="fbPageAccessToken" placeholder="EAAxxxxx...">
+                    <small id="fbPageAccessTokenStatus">No configurado</small>
+                </div>
+                
+                <div class="flex gap-2 mt-3">
+                    <button class="success" onclick="saveSettings()">💾 Guardar Configuración</button>
+                    <button class="secondary" onclick="resetSettingsForm()">🔄 Resetear Formulario</button>
+                </div>
+                
+                <hr style="margin: 32px 0; border: none; border-top: 1px solid var(--border);">
+                
+                <h3 class="mb-2">📚 Documentación Adicional</h3>
+                
+                <div class="form-grid" style="margin-top: 16px;">
+                    <button class="outline" onclick="window.open('https://github.com/Jorguitouy/Facebook-Autopost-Cloudflare', '_blank')">
+                        📖 Ver README
+                    </button>
+                    <button class="outline" onclick="window.open('https://github.com/Jorguitouy/Facebook-Autopost-Cloudflare/blob/master/GUIA-AUTORIZACION-FACEBOOK.md', '_blank')">
+                        🔑 Guía OAuth Facebook
+                    </button>
+                    <button class="outline" onclick="window.open('https://github.com/Jorguitouy/Facebook-Autopost-Cloudflare/blob/master/OPEN-GRAPH-GUIDE.md', '_blank')">
+                        🏷️ Guía Open Graph
+                    </button>
                 </div>
                 
                 <h3 class="mb-2 mt-3">⏰ Horarios de Publicación</h3>
                 <p class="text-gray text-small mb-3">
                     Los horarios de publicación automática se configuran en el archivo <code>wrangler.toml</code>
-                    usando cron triggers.
+                    usando cron triggers. Actualmente:
                 </p>
                 
                 <div class="form-group">
-                    <label>Ejemplo de configuración:</label>
-                    <textarea readonly rows="5">[triggers]
-crons = [
-  "0 9 * * *",   # 9:00 AM UTC
-  "0 14 * * *",  # 2:00 PM UTC
-  "0 19 * * *"   # 7:00 PM UTC
-]</textarea>
+                    <textarea readonly rows="5">9:00 AM UTC - Primera publicación del día
+2:00 PM UTC - Segunda publicación del día
+7:00 PM UTC - Tercera publicación del día
+
+Para cambiar los horarios, edita el archivo wrangler.toml
+y ejecuta: npx wrangler deploy</textarea>
                 </div>
-                
-                <button onclick="window.open('https://github.com/Jorguitouy/Facebook-Autopost-Cloudflare', '_blank')">
-                    📖 Ver Documentación Completa
-                </button>
             </div>
         </div>
     </div>

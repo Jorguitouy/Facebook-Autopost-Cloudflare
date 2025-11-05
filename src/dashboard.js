@@ -63,6 +63,8 @@ function showTab(tabName) {
         loadProjectsForSelect();
     } else if (tabName === 'ai') {
         loadProjectsForAI();
+    } else if (tabName === 'settings') {
+        loadSettings();
     }
 }
 
@@ -812,3 +814,148 @@ function showLoading() {
 function hideLoading() {
     // Implementar si es necesario
 }
+
+// ========================================
+// CONFIGURACIÓN
+// ========================================
+
+async function loadSettings() {
+    try {
+        const response = await fetch('/api/settings');
+        const data = await response.json();
+        
+        if (data.success) {
+            const settings = data.settings;
+            
+            // Proveedor de IA
+            document.getElementById('aiProvider').value = settings.aiProvider || 'openai';
+            
+            // Estado de API Key de IA
+            if (settings.aiApiKeyConfigured) {
+                document.getElementById('aiApiKeyStatus').textContent = `✓ Configurada: ${settings.aiApiKeyPreview}`;
+                document.getElementById('aiApiKeyStatus').style.color = 'var(--success)';
+            } else {
+                document.getElementById('aiApiKeyStatus').textContent = '✗ No configurada';
+                document.getElementById('aiApiKeyStatus').style.color = 'var(--danger)';
+            }
+            
+            // Facebook Page ID
+            if (settings.fbPageId) {
+                document.getElementById('fbPageId').value = settings.fbPageId;
+                document.getElementById('fbPageIdStatus').textContent = '✓ Configurado';
+                document.getElementById('fbPageIdStatus').style.color = 'var(--success)';
+            }
+            
+            // Estado de Facebook Token
+            if (settings.fbPageAccessTokenConfigured) {
+                document.getElementById('fbPageAccessTokenStatus').textContent = `✓ Configurado: ${settings.fbPageAccessTokenPreview}`;
+                document.getElementById('fbPageAccessTokenStatus').style.color = 'var(--success)';
+            } else {
+                document.getElementById('fbPageAccessTokenStatus').textContent = '✗ No configurado';
+                document.getElementById('fbPageAccessTokenStatus').style.color = 'var(--danger)';
+            }
+            
+            // Actualizar info del proveedor
+            updateAIProviderInfo();
+            
+            showMessage('✅ Configuración cargada', 'success');
+        }
+    } catch (error) {
+        showMessage('❌ Error al cargar configuración: ' + error.message, 'error');
+    }
+}
+
+async function saveSettings() {
+    const adminKey = document.getElementById('adminKey').value.trim();
+    
+    if (!adminKey) {
+        showMessage('⚠️ Debes ingresar la clave de administrador', 'error');
+        return;
+    }
+    
+    const settings = {
+        aiProvider: document.getElementById('aiProvider').value,
+        aiApiKey: document.getElementById('aiApiKey').value.trim() || undefined,
+        fbPageId: document.getElementById('fbPageId').value.trim() || undefined,
+        fbPageAccessToken: document.getElementById('fbPageAccessToken').value.trim() || undefined
+    };
+    
+    // Validar que al menos un campo tenga valor
+    if (!settings.aiApiKey && !settings.fbPageId && !settings.fbPageAccessToken) {
+        showMessage('⚠️ Debes completar al menos un campo para guardar', 'error');
+        return;
+    }
+    
+    if (!confirm('¿Guardar la configuración? Esto sobrescribirá los valores actuales.')) {
+        return;
+    }
+    
+    try {
+        const response = await fetch('/api/settings', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'x-admin-key': adminKey
+            },
+            body: JSON.stringify(settings)
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+            showMessage('✅ Configuración guardada exitosamente', 'success');
+            
+            // Limpiar campos sensibles
+            document.getElementById('adminKey').value = '';
+            document.getElementById('aiApiKey').value = '';
+            document.getElementById('fbPageAccessToken').value = '';
+            
+            // Recargar configuración
+            await loadSettings();
+        } else {
+            showMessage('❌ ' + result.error, 'error');
+        }
+    } catch (error) {
+        showMessage('❌ Error al guardar: ' + error.message, 'error');
+    }
+}
+
+function resetSettingsForm() {
+    document.getElementById('adminKey').value = '';
+    document.getElementById('aiProvider').value = 'openai';
+    document.getElementById('aiApiKey').value = '';
+    document.getElementById('fbPageId').value = '';
+    document.getElementById('fbPageAccessToken').value = '';
+    
+    loadSettings();
+}
+
+function updateAIProviderInfo() {
+    const provider = document.getElementById('aiProvider').value;
+    const infoDiv = document.getElementById('aiProviderInfo');
+    const infoText = document.getElementById('aiProviderInfoText');
+    
+    if (provider === 'openai') {
+        infoText.innerHTML = `
+            <strong>OpenAI (GPT)</strong><br>
+            Obtén tu API Key en: <a href="https://platform.openai.com/api-keys" target="_blank">platform.openai.com/api-keys</a><br>
+            Modelos: gpt-3.5-turbo, gpt-4 (configurable en wrangler.toml)
+        `;
+    } else if (provider === 'gemini') {
+        infoText.innerHTML = `
+            <strong>Google Gemini</strong><br>
+            Obtén tu API Key en: <a href="https://makersuite.google.com/app/apikey" target="_blank">makersuite.google.com/app/apikey</a><br>
+            Modelo: gemini-pro (configurable en wrangler.toml)
+        `;
+    }
+    
+    infoDiv.style.display = 'flex';
+}
+
+// Event listener para cambio de proveedor
+document.addEventListener('DOMContentLoaded', () => {
+    const aiProviderSelect = document.getElementById('aiProvider');
+    if (aiProviderSelect) {
+        aiProviderSelect.addEventListener('change', updateAIProviderInfo);
+    }
+});

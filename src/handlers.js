@@ -35,7 +35,10 @@ export async function handleBulkAddProjectPosts(projectId, request, env, corsHea
   
   let newPosts = [];
   
-  if (generateContent && env.OPENAI_API_KEY) {
+  // Verificar si hay API key configurada para generación de contenido
+  const aiApiKey = await env.FB_PUBLISHER_KV.get('AI_API_KEY') || env.OPENAI_API_KEY;
+  
+  if (generateContent && aiApiKey) {
     // Generar contenido con IA para cada URL
     for (const post of posts) {
       const content = await generateContentFromURL(post.url, post.context || '', env);
@@ -95,9 +98,11 @@ export async function handleDeleteProjectPost(projectId, postId, env, corsHeader
 export async function handleGenerateContent(request, env, corsHeaders) {
   const { url, context, template } = await request.json();
   
-  if (!env.OPENAI_API_KEY) {
+  // Verificar si hay API key configurada (en KV o env)
+  const aiApiKey = await env.FB_PUBLISHER_KV.get('AI_API_KEY') || env.OPENAI_API_KEY;
+  if (!aiApiKey) {
     return new Response(JSON.stringify({ 
-      error: 'API Key de OpenAI no configurada' 
+      error: 'API Key de IA no configurada. Configúrala en el panel de Configuración.' 
     }), {
       status: 400,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
@@ -127,9 +132,11 @@ export async function handleGenerateContent(request, env, corsHeaders) {
 export async function handleGenerateBulkContent(request, env, corsHeaders) {
   const { urls, context, template } = await request.json();
   
-  if (!env.OPENAI_API_KEY) {
+  // Verificar si hay API key configurada (en KV o env)
+  const aiApiKey = await env.FB_PUBLISHER_KV.get('AI_API_KEY') || env.OPENAI_API_KEY;
+  if (!aiApiKey) {
     return new Response(JSON.stringify({ 
-      error: 'API Key de OpenAI no configurada' 
+      error: 'API Key de IA no configurada. Configúrala en el panel de Configuración.' 
     }), {
       status: 400,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
@@ -167,9 +174,17 @@ export async function handleGenerateBulkContent(request, env, corsHeaders) {
 }
 
 /**
- * Genera contenido usando OpenAI basándose en la URL
+ * Genera contenido usando IA (OpenAI o Gemini) basándose en la URL
  */
 async function generateContentFromURL(url, context = '', env, template = '') {
+  // Obtener configuración de IA desde KV o variables de entorno
+  const aiProvider = await env.FB_PUBLISHER_KV.get('AI_PROVIDER') || env.AI_PROVIDER || 'openai';
+  const aiApiKey = await env.FB_PUBLISHER_KV.get('AI_API_KEY') || env.OPENAI_API_KEY;
+  
+  if (!aiApiKey) {
+    throw new Error('API Key de IA no configurada');
+  }
+  
   // Obtener contenido de la URL
   let pageContent = '';
   try {
@@ -187,7 +202,7 @@ Descripción: ${descMatch ? descMatch[1] : 'Sin descripción'}`;
     pageContent = `URL: ${url}`;
   }
 
-  // Crear el prompt para OpenAI
+  // Crear el prompt
   const systemPrompt = template || `Eres un experto en marketing de redes sociales. 
 Tu tarea es crear publicaciones atractivas y engagement para Facebook basándote en el contenido de una página web.
 El mensaje debe ser corto (máximo 200 caracteres), atractivo, usar emojis relevantes, y motivar a hacer clic.`;
@@ -204,12 +219,24 @@ Responde SOLO con un objeto JSON con este formato:
   "message": "Mensaje para el post (máximo 200 caracteres, con emojis)"
 }`;
 
+  // Llamar al proveedor correspondiente
+  if (aiProvider === 'gemini') {
+    return await generateWithGemini(systemPrompt, userPrompt, aiApiKey, env);
+  } else {
+    return await generateWithOpenAI(systemPrompt, userPrompt, aiApiKey, env);
+  }
+}
+
+/**
+ * Genera contenido usando OpenAI
+ */
+async function generateWithOpenAI(systemPrompt, userPrompt, apiKey, env) {
   try {
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${env.OPENAI_API_KEY}`
+        'Authorization': `Bearer ${apiKey}`
       },
       body: JSON.stringify({
         model: env.OPENAI_MODEL || 'gpt-3.5-turbo',
@@ -245,7 +272,69 @@ Responde SOLO con un objeto JSON con este formato:
       };
     }
   } catch (error) {
-    console.error('Error generando contenido con IA:', error);
+    console.error('Error generando contenido con OpenAI:', error);
+    throw error;
+  }
+}
+
+/**
+ * Genera contenido usando Google Gemini
+ */
+async function generateWithGemini(systemPrompt, userPrompt, apiKey, env) {
+  try {
+    const model = env.GEMINI_MODEL || 'gemini-pro';
+    const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+    
+    // Gemini usa un formato diferente: combinar system y user prompt
+    const fullPrompt = `${systemPrompt}\n\n${userPrompt}`;
+    
+    const response = await fetch(apiUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        contents: [{
+          parts: [{
+            text: fullPrompt
+          }]
+        }],
+        generationConfig: {
+          temperature: 0.8,
+          maxOutputTokens: 300,
+        }
+      })
+    });
+
+    const data = await response.json();
+    
+    if (!response.ok) {
+      throw new Error(data.error?.message || 'Error en la API de Gemini');
+    }
+
+    // Extraer el contenido de la respuesta de Gemini
+    const content = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+    
+    if (!content) {
+      throw new Error('Respuesta vacía de Gemini');
+    }
+    
+    // Intentar parsear el JSON de la respuesta
+    try {
+      const parsed = JSON.parse(content);
+      return {
+        title: parsed.title || '',
+        message: parsed.message || content
+      };
+    } catch (e) {
+      // Si no es JSON válido, usar el contenido directamente
+      return {
+        title: '',
+        message: content.substring(0, 200)
+      };
+    }
+  } catch (error) {
+    console.error('Error generando contenido con Gemini:', error);
     throw error;
   }
 }
@@ -393,8 +482,9 @@ export function generateId() {
  * Facebook extraerá automáticamente Open Graph tags de la URL
  */
 export async function publishToFacebook(post, env) {
-  const pageAccessToken = env.FB_PAGE_ACCESS_TOKEN;
-  const pageId = env.FB_PAGE_ID;
+  // Intentar obtener credenciales de KV primero, luego env
+  const pageAccessToken = await env.FB_PUBLISHER_KV.get('FB_PAGE_ACCESS_TOKEN') || env.FB_PAGE_ACCESS_TOKEN;
+  const pageId = await env.FB_PUBLISHER_KV.get('FB_PAGE_ID') || env.FB_PAGE_ID;
   const apiVersion = env.FACEBOOK_API_VERSION || 'v18.0';
 
   if (!pageAccessToken || !pageId) {
@@ -502,4 +592,119 @@ export async function publishNextPost(env) {
 
   console.log('No hay posts pendientes para publicar');
   return { success: false, message: 'No hay posts pendientes en ningún proyecto' };
+}
+
+// ========================================
+// CONFIGURACIÓN (SETTINGS)
+// ========================================
+
+/**
+ * GET /api/settings - Obtener configuración actual
+ */
+export async function handleGetSettings(env, corsHeaders) {
+  try {
+    // Obtener configuración desde KV
+    const aiProvider = await env.FB_PUBLISHER_KV.get('AI_PROVIDER') || env.AI_PROVIDER || 'openai';
+    const aiApiKey = await env.FB_PUBLISHER_KV.get('AI_API_KEY') || env.OPENAI_API_KEY;
+    const fbPageId = await env.FB_PUBLISHER_KV.get('FB_PAGE_ID') || env.FB_PAGE_ID;
+    const fbPageAccessToken = await env.FB_PUBLISHER_KV.get('FB_PAGE_ACCESS_TOKEN') || env.FB_PAGE_ACCESS_TOKEN;
+    
+    // Ofuscar las keys para seguridad (mostrar solo primeros/últimos caracteres)
+    const ofuscate = (str) => {
+      if (!str) return '';
+      if (str.length < 10) return '***';
+      return `${str.substring(0, 4)}...${str.substring(str.length - 4)}`;
+    };
+    
+    return new Response(JSON.stringify({
+      success: true,
+      settings: {
+        aiProvider,
+        aiApiKeyConfigured: !!aiApiKey,
+        aiApiKeyPreview: ofuscate(aiApiKey),
+        fbPageId,
+        fbPageIdConfigured: !!fbPageId,
+        fbPageAccessTokenConfigured: !!fbPageAccessToken,
+        fbPageAccessTokenPreview: ofuscate(fbPageAccessToken),
+        geminiModel: env.GEMINI_MODEL || 'gemini-pro',
+        openaiModel: env.OPENAI_MODEL || 'gpt-3.5-turbo'
+      }
+    }), {
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    });
+  } catch (error) {
+    return new Response(JSON.stringify({ 
+      success: false, 
+      error: error.message 
+    }), {
+      status: 500,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    });
+  }
+}
+
+/**
+ * POST /api/settings - Guardar configuración (requiere autenticación)
+ */
+export async function handleSaveSettings(request, env, corsHeaders) {
+  try {
+    // Verificar autenticación con admin key
+    const adminKey = request.headers.get('x-admin-key');
+    const expectedAdminKey = env.ADMIN_KEY;
+    
+    if (!expectedAdminKey) {
+      return new Response(JSON.stringify({ 
+        success: false, 
+        error: 'ADMIN_KEY no configurada en el servidor. Configúrala como secret de Wrangler.' 
+      }), {
+        status: 500,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
+    
+    if (adminKey !== expectedAdminKey) {
+      return new Response(JSON.stringify({ 
+        success: false, 
+        error: 'Clave de administrador inválida' 
+      }), {
+        status: 403,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
+    
+    // Obtener datos del body
+    const data = await request.json();
+    
+    // Guardar configuración en KV
+    if (data.aiProvider) {
+      await env.FB_PUBLISHER_KV.put('AI_PROVIDER', data.aiProvider);
+    }
+    
+    if (data.aiApiKey) {
+      await env.FB_PUBLISHER_KV.put('AI_API_KEY', data.aiApiKey);
+    }
+    
+    if (data.fbPageId) {
+      await env.FB_PUBLISHER_KV.put('FB_PAGE_ID', data.fbPageId);
+    }
+    
+    if (data.fbPageAccessToken) {
+      await env.FB_PUBLISHER_KV.put('FB_PAGE_ACCESS_TOKEN', data.fbPageAccessToken);
+    }
+    
+    return new Response(JSON.stringify({ 
+      success: true,
+      message: 'Configuración guardada exitosamente'
+    }), {
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    });
+  } catch (error) {
+    return new Response(JSON.stringify({ 
+      success: false, 
+      error: error.message 
+    }), {
+      status: 500,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    });
+  }
 }

@@ -4,6 +4,11 @@
  * Con generación de contenido mediante IA
  */
 
+// Importar archivos del dashboard
+import dashboardHTML from './dashboard.html';
+import dashboardCSS from './dashboard.css';
+import dashboardJS from './dashboard.js';
+
 // Importar handlers
 import {
   handleAddProjectPost,
@@ -15,6 +20,8 @@ import {
   handleManualPublish,
   handleGetStats,
   handleGetProjectStats,
+  handleGetSettings,
+  handleSaveSettings,
   updateProjectStats,
   generateId,
   publishToFacebook,
@@ -58,6 +65,13 @@ export default {
       if (url.pathname === '/' || url.pathname === '/dashboard') {
         return new Response(getDashboardHTML(), {
           headers: { ...corsHeaders, 'Content-Type': 'text/html; charset=utf-8' }
+        });
+      }
+
+      // CSS del dashboard
+      if (url.pathname === '/dashboard.css') {
+        return new Response(getDashboardCSS(), {
+          headers: { ...corsHeaders, 'Content-Type': 'text/css; charset=utf-8' }
         });
       }
 
@@ -142,6 +156,15 @@ export default {
       if (url.pathname.match(/^\/api\/projects\/[^/]+\/stats$/) && request.method === 'GET') {
         const projectId = url.pathname.split('/')[3];
         return handleGetProjectStats(projectId, env, corsHeaders);
+      }
+
+      // ========== CONFIGURACIÓN ==========
+      if (url.pathname === '/api/settings' && request.method === 'GET') {
+        return handleGetSettings(env, corsHeaders);
+      }
+
+      if (url.pathname === '/api/settings' && request.method === 'POST') {
+        return handleSaveSettings(request, env, corsHeaders);
       }
 
       return new Response('Not Found', { status: 404, headers: corsHeaders });
@@ -283,65 +306,18 @@ async function handleGetProjectPosts(projectId, env, corsHeaders) {
 }
 
 // ========================================
-// DASHBOARD HTML
+// DASHBOARD ASSETS
 // ========================================
 
 function getDashboardHTML() {
-  // Leer desde el archivo externo en producción
-  // Por ahora, retornamos el HTML inline
-  return `<!DOCTYPE html>
-<html lang="es">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="description" content="Panel de control para automatizar publicaciones en Facebook con múltiples proyectos y generación de contenido con IA">
-    <title>Facebook Auto-Publisher - Panel de Control</title>
-    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📘</text></svg>">
-</head>
-<body>
-    <div style="text-align: center; padding: 100px 20px;">
-        <div style="font-size: 64px; margin-bottom: 24px;">📘</div>
-        <h1 style="font-size: 32px; margin-bottom: 16px; color: #1877f2;">Facebook Auto-Publisher</h1>
-        <p style="color: #65676b; margin-bottom: 32px;">Cargando panel de control...</p>
-        <div style="width: 40px; height: 40px; border: 4px solid #f0f2f5; border-top: 4px solid #1877f2; border-radius: 50%; margin: 0 auto; animation: spin 1s linear infinite;"></div>
-    </div>
-    <style>
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-        }
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-            margin: 0;
-            padding: 0;
-            background: #f0f2f5;
-        }
-    </style>
-    <script src="/dashboard.js" defer></script>
-    <script>
-        // Redirigir al dashboard completo una vez cargado el JS
-        document.addEventListener('DOMContentLoaded', () => {
-            setTimeout(() => {
-                if (typeof init === 'function') {
-                    document.body.innerHTML = \`${getDashboardHTMLContent()}\`;
-                    init();
-                }
-            }, 100);
-        });
-    </script>
-</body>
-</html>`;
+  return dashboardHTML;
 }
 
-function getDashboardHTMLContent() {
-  // El contenido real del dashboard se carga dinámicamente
-  // Para simplificar, vamos a retornar una versión inline
-  // En producción, esto debería venir de un archivo separado
-  return 'Dashboard cargado...';
+function getDashboardCSS() {
+  return dashboardCSS;
 }
 
 function getDashboardJS() {
-  // Retornar el contenido del archivo dashboard.js
-  // Por simplicidad, vamos a incluirlo inline
-  return `console.log('Dashboard JS cargado');`;
+  return dashboardJS;
 }
+
