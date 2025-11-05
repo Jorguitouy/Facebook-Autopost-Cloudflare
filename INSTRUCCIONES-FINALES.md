@@ -102,6 +102,8 @@ id = "PEGA_AQUI_EL_ID_QUE_TE_DIO_EL_COMANDO"
 
 ### Paso 4: Configurar credenciales de Facebook
 
+**🔐 IMPORTANTE:** Este es el paso donde autorizas a tu app a publicar en tu fanpage.
+
 ```powershell
 # Token de acceso de tu página de Facebook
 npx wrangler secret put FB_PAGE_ACCESS_TOKEN
@@ -110,13 +112,24 @@ npx wrangler secret put FB_PAGE_ACCESS_TOKEN
 npx wrangler secret put FB_PAGE_ID
 ```
 
-**¿Cómo obtener estos valores?**
-1. Ve a https://developers.facebook.com/
-2. Crea o selecciona una app
-3. Ve a Graph API Explorer
-4. Selecciona tu página
-5. Agrega permisos: `pages_manage_posts`, `pages_read_engagement`
-6. Genera el token
+**📖 Guía Completa de Autorización:**
+
+El proceso de autorización tiene varios pasos importantes. He creado una guía detallada paso a paso:
+
+👉 **[GUIA-AUTORIZACION-FACEBOOK.md](GUIA-AUTORIZACION-FACEBOOK.md)** 👈
+
+**Resumen rápido:**
+1. Crear app en Facebook Developers
+2. Usar Graph API Explorer
+3. **Autorizar tu app** (click "Continue as...")
+4. Seleccionar tu fanpage
+5. Obtener Page Access Token (nunca expira)
+6. Configurar en Cloudflare Secrets
+
+**Permisos necesarios:**
+- ✓ `pages_show_list`
+- ✓ `pages_manage_posts`
+- ✓ `pages_read_engagement`
 
 ### Paso 5: Configurar OpenAI (para usar la IA)
 

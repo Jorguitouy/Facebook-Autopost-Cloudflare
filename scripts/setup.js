@@ -26,13 +26,31 @@ Para configurar el sistema, sigue estos pasos:
 
 4️⃣  OBTENER CREDENCIALES DE FACEBOOK
 
+   🔐 PROCESO DE AUTORIZACIÓN (IMPORTANTE)
+   
+   Este paso requiere que TÚ autorices a tu app a publicar en tu fanpage.
+   
+   📖 Guía completa paso a paso:
+   Ver: GUIA-AUTORIZACION-FACEBOOK.md
+   
+   Resumen rápido:
+   
    A. Ve a https://developers.facebook.com/
    B. Crea una app o usa una existente
    C. Ve a Graph API Explorer: https://developers.facebook.com/tools/explorer/
    D. Selecciona tu app y tu página
-   E. Agrega los permisos: pages_manage_posts, pages_read_engagement
-   F. Genera un token de acceso
-   G. Obtén el ID de tu página desde: https://www.facebook.com/[tu-pagina]/about
+   E. Click "Generate Access Token" → Aquí AUTORIZAS tu app
+   F. Selecciona permisos: 
+      ✓ pages_show_list
+      ✓ pages_manage_posts
+      ✓ pages_read_engagement
+   G. Click "Continue as [Tu Nombre]" → Autorización confirmada
+   H. Copia el token
+   I. Extiende el token a 60 días (Access Token Debugger)
+   J. Obtén el Page Access Token (nunca expira):
+      Query en Explorer: me/accounts
+      Copia el "access_token" de tu página
+   K. Obtén el Page ID desde tu fanpage (About section)
 
 5️⃣  CONFIGURAR SECRETOS EN CLOUDFLARE
    
