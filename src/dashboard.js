@@ -1279,77 +1279,34 @@ async function testCurrentAIConfig() {
     resultDiv.style.display = 'flex';
     
     try {
-        let response;
+        // Hacer la prueba a través del backend para evitar problemas de CORS
+        const response = await fetch('/api/test-ai', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                provider: provider,
+                model: model,
+                apiKey: apiKey
+            })
+        });
         
-        if (provider === 'openai') {
-            // Probar OpenAI
-            response = await fetch('https://api.openai.com/v1/chat/completions', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${apiKey}`
-                },
-                body: JSON.stringify({
-                    model: model,
-                    messages: [
-                        { role: 'user', content: 'Di solo: OK' }
-                    ],
-                    max_tokens: 10
-                })
-            });
-            
-            const data = await response.json();
-            
-            if (!response.ok) {
-                throw new Error(data.error?.message || 'Error al conectar con OpenAI');
-            }
-            
-            const content = data.choices?.[0]?.message?.content || '';
-            resultDiv.className = 'message success';
-            resultDiv.innerHTML = `
-                <span>✅</span>
-                <div>
-                    <strong>Conexión exitosa con OpenAI</strong><br>
-                    Modelo: ${model}<br>
-                    Respuesta: "${content.substring(0, 50)}"
-                </div>
-            `;
-            
-        } else if (provider === 'gemini') {
-            // Probar Gemini
-            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/${model}:generateContent?key=${apiKey}`;
-            
-            response = await fetch(apiUrl, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    contents: [{
-                        parts: [{
-                            text: 'Di solo: OK'
-                        }]
-                    }]
-                })
-            });
-            
-            const data = await response.json();
-            
-            if (!response.ok) {
-                throw new Error(data.error?.message || 'Error al conectar con Gemini');
-            }
-            
-            const content = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
-            resultDiv.className = 'message success';
-            resultDiv.innerHTML = `
-                <span>✅</span>
-                <div>
-                    <strong>Conexión exitosa con Gemini</strong><br>
-                    Modelo: ${model}<br>
-                    Respuesta: "${content.substring(0, 50)}"
-                </div>
-            `;
+        const data = await response.json();
+        
+        if (!response.ok || !data.success) {
+            throw new Error(data.error || 'Error al conectar con la API');
         }
+        
+        resultDiv.className = 'message success';
+        resultDiv.innerHTML = `
+            <span>✅</span>
+            <div>
+                <strong>Conexión exitosa con ${data.provider}</strong><br>
+                Modelo: ${data.model}<br>
+                Respuesta: "${data.response}"
+            </div>
+        `;
         
     } catch (error) {
         resultDiv.className = 'message error';

@@ -23,6 +23,7 @@ import {
   handleGetProjectStats,
   handleGetSettings,
   handleSaveSettings,
+  handleTestAI,
   updateProjectStats,
   generateId,
   publishToFacebook,
@@ -174,6 +175,10 @@ export default {
 
       if (url.pathname === '/api/settings' && request.method === 'POST') {
         return handleSaveSettings(request, env, corsHeaders);
+      }
+
+      if (url.pathname === '/api/test-ai' && request.method === 'POST') {
+        return handleTestAI(request, env, corsHeaders);
       }
 
       return new Response('Not Found', { status: 404, headers: corsHeaders });

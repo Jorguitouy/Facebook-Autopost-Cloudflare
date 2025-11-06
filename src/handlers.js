@@ -736,6 +736,109 @@ export async function handleSaveSettings(request, env, corsHeaders) {
 }
 
 /**
+ * POST /api/test-ai - Probar configuración de IA
+ */
+export async function handleTestAI(request, env, corsHeaders) {
+  try {
+    const { provider, model, apiKey } = await request.json();
+    
+    if (!provider || !model || !apiKey) {
+      return new Response(JSON.stringify({ 
+        success: false, 
+        error: 'Faltan parámetros: provider, model y apiKey son requeridos' 
+      }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
+    
+    // Probar la API según el proveedor
+    if (provider === 'openai') {
+      const response = await fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${apiKey}`
+        },
+        body: JSON.stringify({
+          model: model,
+          messages: [{ role: 'user', content: 'Di solo: OK' }],
+          max_tokens: 10
+        })
+      });
+      
+      const data = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(data.error?.message || 'Error al conectar con OpenAI');
+      }
+      
+      const content = data.choices?.[0]?.message?.content || '';
+      
+      return new Response(JSON.stringify({ 
+        success: true,
+        provider: 'OpenAI',
+        model: model,
+        response: content.substring(0, 50)
+      }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+      
+    } else if (provider === 'gemini') {
+      const apiUrl = `https://generativelanguage.googleapis.com/v1beta/${model}:generateContent?key=${apiKey}`;
+      
+      const response = await fetch(apiUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          contents: [{
+            parts: [{
+              text: 'Di solo: OK'
+            }]
+          }]
+        })
+      });
+      
+      const data = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(data.error?.message || JSON.stringify(data));
+      }
+      
+      const content = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+      
+      return new Response(JSON.stringify({ 
+        success: true,
+        provider: 'Gemini',
+        model: model,
+        response: content.substring(0, 50)
+      }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    } else {
+      return new Response(JSON.stringify({ 
+        success: false, 
+        error: 'Proveedor no soportado: ' + provider 
+      }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
+    
+  } catch (error) {
+    return new Response(JSON.stringify({ 
+      success: false, 
+      error: error.message 
+    }), {
+      status: 500,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    });
+  }
+}
+
+/**
  * POST /api/projects/:id/generate-all-posts
  * Genera contenido con IA para TODAS las URLs del proyecto que aún no tienen posts
  */
