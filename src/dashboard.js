@@ -1309,7 +1309,7 @@ async function testCurrentAIConfig() {
             
         } else if (provider === 'gemini') {
             // Probar Gemini
-            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/${model}:generateContent?key=${apiKey}`;
             
             response = await fetch(apiUrl, {
                 method: 'POST',
