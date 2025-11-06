@@ -8,6 +8,7 @@
 import dashboardHTML from './dashboard.html';
 import dashboardCSS from './dashboard.css';
 import dashboardJS from './dashboard.js';
+import loginHTML from './login.html';
 
 // Importar handlers
 import {
@@ -38,6 +39,14 @@ import {
   handlePageSelection,
   handleDisconnectPage
 } from './facebook-auth.js';
+
+// Importar handlers de autenticación del sistema
+import {
+  requireAuth,
+  handleLogin,
+  handleLogout,
+  handleGetCurrentUser
+} from './auth.js';
 
 export default {
   /**
@@ -71,6 +80,63 @@ export default {
     }
 
     try {
+      // ========== AUTENTICACIÓN ==========
+      // Página de login
+      if (url.pathname === '/login') {
+        return new Response(getLoginHTML(), {
+          headers: { ...corsHeaders, 'Content-Type': 'text/html; charset=utf-8' }
+        });
+      }
+
+      // API de login
+      if (url.pathname === '/api/auth/login' && request.method === 'POST') {
+        return handleLogin(request, env, corsHeaders);
+      }
+
+      // API de logout
+      if (url.pathname === '/api/auth/logout' && request.method === 'POST') {
+        return handleLogout(request, env, corsHeaders);
+      }
+
+      // API para obtener usuario actual
+      if (url.pathname === '/api/auth/me' && request.method === 'GET') {
+        return handleGetCurrentUser(request, env, corsHeaders);
+      }
+
+      // ========== RUTAS PROTEGIDAS ==========
+      // Verificar autenticación para todas las rutas del dashboard y APIs (excepto OAuth de Facebook)
+      const isProtectedRoute = 
+        url.pathname === '/' || 
+        url.pathname === '/dashboard' ||
+        url.pathname === '/dashboard.css' ||
+        url.pathname === '/dashboard.js' ||
+        url.pathname.startsWith('/api/projects') ||
+        url.pathname.startsWith('/api/stats') ||
+        url.pathname.startsWith('/api/settings') ||
+        url.pathname.startsWith('/api/generate') ||
+        url.pathname.startsWith('/api/publish') ||
+        url.pathname.startsWith('/api/test');
+
+      if (isProtectedRoute) {
+        const user = await requireAuth(request, env);
+        
+        if (!user) {
+          // No autenticado - redirigir a login
+          if (url.pathname.startsWith('/api/')) {
+            // Para rutas API, devolver 401
+            return new Response(JSON.stringify({ 
+              error: 'No autenticado. Por favor inicia sesión.' 
+            }), {
+              status: 401,
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+            });
+          } else {
+            // Para páginas HTML, redirigir a login
+            return Response.redirect(`${url.origin}/login`, 302);
+          }
+        }
+      }
+
       // Dashboard principal
       if (url.pathname === '/' || url.pathname === '/dashboard') {
         return new Response(getDashboardHTML(), {
@@ -403,5 +469,9 @@ function getDashboardCSS() {
 
 function getDashboardJS() {
   return dashboardJS;
+}
+
+function getLoginHTML() {
+  return loginHTML;
 }
 
