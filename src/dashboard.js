@@ -943,6 +943,7 @@ async function testAIConnection() {
 async function generateContent() {
     const projectId = document.getElementById('aiProjectSelect').value;
     const url = document.getElementById('aiUrl').value.trim();
+    const aiPrompt = document.getElementById('aiPrompt').value.trim();
     const context = document.getElementById('aiContext').value.trim();
     
     if (!url) {
@@ -953,17 +954,22 @@ async function generateContent() {
     showMessage('🤖 Generando contenido con IA...', 'info');
     
     try {
+        // Combinar prompt y contexto
+        const finalContext = aiPrompt 
+            ? (context ? `${aiPrompt}\n\n${context}` : aiPrompt)
+            : context;
+        
         const response = await fetch('/api/generate-content', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ url, context })
+            body: JSON.stringify({ projectId, url, context: finalContext })
         });
         
         const result = await response.json();
         
         if (result.success) {
-            document.getElementById('aiGeneratedTitle').value = result.content.title;
-            document.getElementById('aiGeneratedMessage').value = result.content.message;
+            document.getElementById('aiGeneratedTitle').value = result.title;
+            document.getElementById('aiGeneratedMessage').value = result.message;
             document.getElementById('aiResult').style.display = 'block';
             showMessage('✅ Contenido generado exitosamente', 'success');
         } else {
@@ -1012,6 +1018,7 @@ async function saveGeneratedPost() {
 async function generateBulkContent() {
     const projectId = document.getElementById('aiBulkProjectSelect').value;
     const urlsText = document.getElementById('aiBulkUrls').value.trim();
+    const bulkPrompt = document.getElementById('aiBulkPrompt').value.trim();
     
     if (!projectId) {
         showMessage('⚠️ Selecciona un proyecto', 'error');
@@ -1025,7 +1032,8 @@ async function generateBulkContent() {
     
     const urls = urlsText.split('\n').filter(u => u.trim()).map(u => u.trim());
     
-    if (!confirm(`¿Generar contenido con IA para ${urls.length} URLs?\n\nEsto puede tomar varios minutos.`)) {
+    const promptMsg = bulkPrompt ? ' usando tu prompt personalizado' : '';
+    if (!confirm(`¿Generar contenido con IA para ${urls.length} URLs${promptMsg}?\n\nEsto puede tomar varios minutos.`)) {
         return;
     }
     
@@ -1038,7 +1046,11 @@ async function generateBulkContent() {
         const response = await fetch(`/api/projects/${projectId}/posts/bulk`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ posts, generateContent: true })
+            body: JSON.stringify({ 
+                posts, 
+                generateContent: true,
+                aiPrompt: bulkPrompt || undefined
+            })
         });
         
         const result = await response.json();
@@ -1046,6 +1058,7 @@ async function generateBulkContent() {
         if (result.success) {
             showMessage(`✅ ${result.count} posts generados y guardados`, 'success');
             document.getElementById('aiBulkUrls').value = '';
+            document.getElementById('aiBulkPrompt').value = '';
             await loadStats();
         } else {
             showMessage('❌ Error al generar contenido', 'error');

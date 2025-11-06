@@ -31,7 +31,7 @@ export async function handleAddProjectPost(projectId, request, env, corsHeaders)
 }
 
 export async function handleBulkAddProjectPosts(projectId, request, env, corsHeaders) {
-  const { posts, generateContent } = await request.json();
+  const { posts, generateContent, aiPrompt } = await request.json();
   
   let newPosts = [];
   
@@ -39,9 +39,25 @@ export async function handleBulkAddProjectPosts(projectId, request, env, corsHea
   const aiApiKey = await env.FB_PUBLISHER_KV.get('AI_API_KEY');
   
   if (generateContent && aiApiKey) {
+    // Obtener el aiPrompt del proyecto si no se proporcionó uno explícito
+    let finalPrompt = aiPrompt;
+    if (!finalPrompt && projectId) {
+      const projects = await env.FB_PUBLISHER_KV.get('projects', { type: 'json' }) || { projects: [] };
+      const project = projects.projects.find(p => p.id === projectId);
+      if (project && project.aiPrompt) {
+        finalPrompt = project.aiPrompt;
+        console.log(`[handleBulkAddProjectPosts] Usando prompt del proyecto: ${finalPrompt.substring(0, 100)}...`);
+      }
+    }
+    
     // Generar contenido con IA para cada URL
     for (const post of posts) {
-      const content = await generateContentFromURL(post.url, post.context || '', env);
+      // Combinar el prompt con cualquier contexto adicional del post
+      const context = finalPrompt 
+        ? (post.context ? `${finalPrompt}\n\n${post.context}` : finalPrompt)
+        : (post.context || '');
+      
+      const content = await generateContentFromURL(post.url, context, env);
       newPosts.push({
         id: generateId(),
         url: post.url,

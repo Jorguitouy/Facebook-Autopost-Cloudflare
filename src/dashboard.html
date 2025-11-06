@@ -177,8 +177,14 @@
                 </div>
                 
                 <div class="form-group">
+                    <label>🤖 Prompt para la IA (opcional)</label>
+                    <textarea id="aiPrompt" rows="4" placeholder="Ej: Crea un post profesional sobre este servicio. Usa tono cercano y menciona garantía. Incluye emojis y hashtags relevantes."></textarea>
+                    <small>Define cómo debe la IA generar el contenido. Si dejas vacío, usará el prompt del proyecto.</small>
+                </div>
+                
+                <div class="form-group">
                     <label>Contexto adicional (opcional)</label>
-                    <textarea id="aiContext" placeholder="Agrega contexto adicional para que la IA genere mejor contenido..."></textarea>
+                    <textarea id="aiContext" placeholder="Información adicional que quieras que la IA considere..."></textarea>
                 </div>
                 
                 <button onclick="generateContent()">✨ Generar Contenido</button>
@@ -215,6 +221,12 @@
                     <label>URLs (una por línea)</label>
                     <textarea id="aiBulkUrls" rows="10" placeholder="https://tusitio.com/url1&#10;https://tusitio.com/url2&#10;https://tusitio.com/url3"></textarea>
                     <small>Ingresa una URL por línea</small>
+                </div>
+                
+                <div class="form-group">
+                    <label>🤖 Prompt para la IA (opcional)</label>
+                    <textarea id="aiBulkPrompt" rows="5" placeholder="Ej: Crea posts sobre servicios técnicos. Usa tono profesional y cercano. Menciona que somos especialistas. Incluye emojis y hashtags #servicio #especialistas"></textarea>
+                    <small>Define cómo debe la IA generar el contenido para todas estas URLs. Si dejas vacío, usará el prompt del proyecto (si tiene uno).</small>
                 </div>
                 
                 <button onclick="generateBulkContent()">✨ Generar Todo el Contenido</button>
