@@ -31,6 +31,14 @@ import {
   publishNextPost
 } from './handlers.js';
 
+// Importar handlers de autenticación de Facebook
+import {
+  getFacebookLoginUrl,
+  handleFacebookCallback,
+  handlePageSelection,
+  handleDisconnectPage
+} from './facebook-auth.js';
+
 export default {
   /**
    * Handler para Cron Triggers - Se ejecuta en los horarios configurados
@@ -179,6 +187,36 @@ export default {
 
       if (url.pathname === '/api/test-ai' && request.method === 'POST') {
         return handleTestAI(request, env, corsHeaders);
+      }
+
+      // ========== AUTENTICACIÓN DE FACEBOOK ==========
+      // Iniciar flujo OAuth de Facebook
+      if (url.pathname === '/api/auth/facebook/login' && request.method === 'GET') {
+        const projectId = url.searchParams.get('projectId');
+        if (!projectId) {
+          return new Response(JSON.stringify({ error: 'projectId requerido' }), {
+            status: 400,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          });
+        }
+        const redirectUri = `${url.origin}/auth/facebook/callback`;
+        const loginUrl = getFacebookLoginUrl(env, projectId, redirectUri);
+        return Response.redirect(loginUrl, 302);
+      }
+
+      // Callback de Facebook OAuth
+      if (url.pathname === '/auth/facebook/callback' && request.method === 'GET') {
+        return handleFacebookCallback(request, env, corsHeaders);
+      }
+
+      // Seleccionar página después de OAuth
+      if (url.pathname === '/api/auth/facebook/select-page' && request.method === 'POST') {
+        return handlePageSelection(request, env, corsHeaders);
+      }
+
+      // Desconectar fanpage de un proyecto
+      if (url.pathname.match(/^\/api\/projects\/[^/]+\/disconnect-facebook$/) && request.method === 'POST') {
+        return handleDisconnectPage(request, env, corsHeaders);
       }
 
       return new Response('Not Found', { status: 404, headers: corsHeaders });

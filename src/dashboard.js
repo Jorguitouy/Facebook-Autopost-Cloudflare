@@ -297,6 +297,9 @@ function editProject(projectId) {
     const project = projects.find(p => p.id === projectId);
     if (!project) return;
     
+    // Guardar projectId en una variable global para usarla en connectFacebook()
+    window.currentEditingProjectId = projectId;
+    
     document.getElementById('editProjectId').value = project.id;
     document.getElementById('editProjectName').value = project.name;
     document.getElementById('editProjectDomain').value = project.domain;
@@ -307,6 +310,9 @@ function editProject(projectId) {
     // Cargar URLs existentes
     const urlsText = (project.urls || []).join('\n');
     document.getElementById('editProjectUrls').value = urlsText;
+    
+    // Actualizar estado de Facebook
+    updateFacebookStatus(project);
     
     document.getElementById('editProjectModal').classList.add('active');
 }
@@ -1492,3 +1498,135 @@ async function deleteSelectedPosts(projectId) {
     }
 }
 
+// ========== FUNCIONES DE FACEBOOK OAUTH ==========
+
+/**
+ * Actualiza el estado visual de la conexión de Facebook
+ */
+function updateFacebookStatus(project) {
+    const statusDiv = document.getElementById('facebookStatus');
+    
+    if (project.facebook && project.facebook.pageId) {
+        // Página conectada
+        statusDiv.innerHTML = `
+            <div class="status-connected">
+                <div class="facebook-page-info">
+                    <span>✅ Conectado</span>
+                    <div>
+                        <div class="facebook-page-name">${project.facebook.pageName}</div>
+                        <div class="facebook-page-id">ID: ${project.facebook.pageId}</div>
+                    </div>
+                </div>
+                <button type="button" class="btn-disconnect-facebook" onclick="disconnectFacebook('${project.id}')">
+                    🔌 Desconectar
+                </button>
+            </div>
+        `;
+    } else {
+        // Sin conexión
+        statusDiv.innerHTML = `
+            <div class="status-disconnected">
+                <span>❌ No conectado</span>
+                <button type="button" class="btn-connect-facebook" onclick="connectFacebook()">
+                    📘 Conectar Fanpage
+                </button>
+            </div>
+        `;
+    }
+}
+
+/**
+ * Inicia el flujo OAuth de Facebook
+ */
+function connectFacebook() {
+    const projectId = window.currentEditingProjectId;
+    
+    if (!projectId) {
+        showMessage('❌ Error: No hay proyecto seleccionado', 'error');
+        return;
+    }
+    
+    // Abrir ventana de OAuth de Facebook
+    const loginUrl = `${API_BASE}/api/auth/facebook/login?projectId=${projectId}`;
+    
+    // Abrir en una nueva ventana popup
+    const width = 600;
+    const height = 700;
+    const left = (screen.width / 2) - (width / 2);
+    const top = (screen.height / 2) - (height / 2);
+    
+    const popup = window.open(
+        loginUrl,
+        'Facebook Login',
+        `width=${width},height=${height},left=${left},top=${top},toolbar=no,menubar=no,scrollbars=yes`
+    );
+    
+    if (!popup) {
+        showMessage('❌ Por favor permite las ventanas emergentes para este sitio', 'error');
+        return;
+    }
+    
+    // Escuchar el cierre de la ventana popup
+    const checkPopupClosed = setInterval(() => {
+        if (popup.closed) {
+            clearInterval(checkPopupClosed);
+            // Recargar el proyecto para ver si se conectó
+            setTimeout(async () => {
+                await loadProjects();
+                const project = projects.find(p => p.id === projectId);
+                if (project && project.facebook) {
+                    showMessage('✅ Fanpage conectada exitosamente', 'success');
+                    updateFacebookStatus(project);
+                }
+            }, 1000);
+        }
+    }, 500);
+}
+
+/**
+ * Desconecta la fanpage de un proyecto
+ */
+async function disconnectFacebook(projectId) {
+    if (!confirm('¿Estás seguro de desconectar esta fanpage? Las publicaciones programadas no se publicarán hasta que reconectes.')) {
+        return;
+    }
+    
+    try {
+        const response = await fetch(`${API_BASE}/api/projects/${projectId}/disconnect-facebook`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            showMessage('✅ Fanpage desconectada', 'success');
+            
+            // Recargar proyectos y actualizar estado
+            await loadProjects();
+            const project = projects.find(p => p.id === projectId);
+            if (project) {
+                updateFacebookStatus(project);
+            }
+        } else {
+            throw new Error(data.error || 'Error al desconectar');
+        }
+        
+    } catch (error) {
+        showMessage('❌ Error: ' + error.message, 'error');
+    }
+}
+
+// Detectar cuando se vuelve de la autenticación de Facebook
+window.addEventListener('load', () => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const connectedPage = urlParams.get('connected');
+    
+    if (connectedPage) {
+        showMessage(`✅ Fanpage "${decodeURIComponent(connectedPage)}" conectada exitosamente`, 'success');
+        // Limpiar el parámetro de la URL
+        window.history.replaceState({}, document.title, window.location.pathname);
+    }
+});

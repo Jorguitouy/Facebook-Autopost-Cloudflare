@@ -405,6 +405,20 @@ y ejecuta: npx wrangler deploy</textarea>
                 <small>Define cómo debe la IA generar contenido para las URLs de este proyecto.</small>
             </div>
             
+            <!-- Sección de Facebook -->
+            <div class="form-group">
+                <label>📘 Conexión con Facebook</label>
+                <div id="facebookStatus" class="facebook-status">
+                    <div class="status-disconnected">
+                        <span>❌ No conectado</span>
+                        <button type="button" class="btn-connect-facebook" onclick="connectFacebook()">
+                            📘 Conectar Fanpage
+                        </button>
+                    </div>
+                </div>
+                <small>Conecta una fanpage para publicar automáticamente.</small>
+            </div>
+            
             <div class="form-group checkbox-group">
                 <input type="checkbox" id="editProjectActive">
                 <label>Proyecto activo</label>

@@ -683,3 +683,91 @@ button.outline:hover {
         flex: 1;
     }
 }
+
+/* Facebook Connection Status */
+.facebook-status {
+    padding: 15px;
+    border-radius: 8px;
+    background: #f8f9fa;
+    border: 2px solid #dee2e6;
+}
+
+.status-disconnected,
+.status-connected {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
+.status-disconnected span {
+    color: #dc3545;
+    font-weight: 600;
+}
+
+.status-connected span {
+    color: #28a745;
+    font-weight: 600;
+}
+
+.facebook-page-info {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex: 1;
+}
+
+.facebook-page-name {
+    font-size: 16px;
+    color: #2c3e50;
+    font-weight: 600;
+}
+
+.facebook-page-id {
+    font-size: 12px;
+    color: #6c757d;
+}
+
+.btn-connect-facebook,
+.btn-disconnect-facebook {
+    padding: 8px 16px;
+    border-radius: 6px;
+    border: none;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s;
+    font-size: 14px;
+}
+
+.btn-connect-facebook {
+    background: #1877f2;
+    color: white;
+}
+
+.btn-connect-facebook:hover {
+    background: #166fe5;
+    transform: translateY(-2px);
+}
+
+.btn-disconnect-facebook {
+    background: #dc3545;
+    color: white;
+}
+
+.btn-disconnect-facebook:hover {
+    background: #c82333;
+    transform: translateY(-2px);
+}
+
+.facebook-connected-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 4px 12px;
+    background: #d4edda;
+    color: #155724;
+    border-radius: 12px;
+    font-size: 12px;
+    font-weight: 600;
+}
