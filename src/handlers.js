@@ -187,9 +187,13 @@ export async function handleGenerateBulkContent(request, env, corsHeaders) {
  * Genera contenido usando IA (OpenAI o Gemini) basándose en la URL
  */
 async function generateContentFromURL(url, context = '', env, template = '') {
+  console.log(`[generateContentFromURL] Iniciando generación para: ${url}`);
+  
   // Obtener configuración de IA SOLO desde KV (Panel Web)
   const aiProvider = await env.FB_PUBLISHER_KV.get('AI_PROVIDER') || 'openai';
   const aiApiKey = await env.FB_PUBLISHER_KV.get('AI_API_KEY');
+  
+  console.log(`[generateContentFromURL] Provider: ${aiProvider}, API Key existe: ${!!aiApiKey}`);
   
   if (!aiApiKey) {
     throw new Error('API Key de IA no configurada. Por favor configúrala desde el Panel Web (Tab Configuración).');
@@ -197,19 +201,62 @@ async function generateContentFromURL(url, context = '', env, template = '') {
   
   // Obtener contenido de la URL
   let pageContent = '';
+  let pageTitle = '';
+  let pageDescription = '';
+  
   try {
-    const response = await fetch(url);
+    console.log(`[generateContentFromURL] Obteniendo contenido de: ${url}`);
+    const response = await fetch(url, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+      }
+    });
+    
+    if (!response.ok) {
+      console.log(`[generateContentFromURL] Error HTTP: ${response.status}`);
+      throw new Error(`HTTP ${response.status}`);
+    }
+    
     const html = await response.text();
+    console.log(`[generateContentFromURL] HTML obtenido, tamaño: ${html.length} caracteres`);
     
-    // Extraer título y descripción básica
+    // Extraer título
     const titleMatch = html.match(/<title>(.*?)<\/title>/i);
-    const descMatch = html.match(/<meta\s+name=["']description["']\s+content=["'](.*?)["']/i);
+    pageTitle = titleMatch ? titleMatch[1].trim() : '';
     
-    pageContent = `Título: ${titleMatch ? titleMatch[1] : 'Sin título'}
-Descripción: ${descMatch ? descMatch[1] : 'Sin descripción'}`;
+    // Extraer meta description
+    const descMatch = html.match(/<meta\s+name=["']description["']\s+content=["'](.*?)["']/i);
+    pageDescription = descMatch ? descMatch[1].trim() : '';
+    
+    // Extraer Open Graph
+    if (!pageTitle) {
+      const ogTitleMatch = html.match(/<meta\s+property=["']og:title["']\s+content=["'](.*?)["']/i);
+      pageTitle = ogTitleMatch ? ogTitleMatch[1].trim() : '';
+    }
+    
+    if (!pageDescription) {
+      const ogDescMatch = html.match(/<meta\s+property=["']og:description["']\s+content=["'](.*?)["']/i);
+      pageDescription = ogDescMatch ? ogDescMatch[1].trim() : '';
+    }
+    
+    // Extraer primeros párrafos de contenido
+    const contentMatch = html.match(/<p[^>]*>(.*?)<\/p>/i);
+    const firstParagraph = contentMatch ? contentMatch[1].replace(/<[^>]*>/g, '').trim() : '';
+    
+    console.log(`[generateContentFromURL] Título: ${pageTitle}`);
+    console.log(`[generateContentFromURL] Descripción: ${pageDescription}`);
+    
+    pageContent = `URL: ${url}
+Título: ${pageTitle || 'Sin título'}
+Descripción: ${pageDescription || 'Sin descripción'}
+${firstParagraph ? `Contenido: ${firstParagraph.substring(0, 300)}...` : ''}`;
+    
   } catch (error) {
-    console.log('No se pudo obtener contenido de la URL:', error.message);
-    pageContent = `URL: ${url}`;
+    console.log(`[generateContentFromURL] Error obteniendo contenido: ${error.message}`);
+    // Usar solo la URL si no se puede obtener el contenido
+    pageContent = `URL: ${url}
+Título: ${url.split('/').pop() || 'Artículo'}
+Descripción: Contenido de ${url.split('//')[1]?.split('/')[0] || 'nuestro sitio web'}`;
   }
 
   // Crear el prompt
@@ -228,6 +275,8 @@ Responde SOLO con un objeto JSON con este formato:
   "title": "Título corto y atractivo",
   "message": "Mensaje para el post (máximo 200 caracteres, con emojis)"
 }`;
+
+  console.log(`[generateContentFromURL] Llamando a ${aiProvider}...`);
 
   // Llamar al proveedor correspondiente
   if (aiProvider === 'gemini') {
@@ -299,6 +348,9 @@ async function generateWithGemini(systemPrompt, userPrompt, apiKey, env) {
     const model = await env.FB_PUBLISHER_KV.get('AI_MODEL') || 'models/gemini-2.5-flash';
     const apiUrl = `https://generativelanguage.googleapis.com/v1beta/${model}:generateContent?key=${apiKey}`;
     
+    console.log(`[generateWithGemini] Modelo: ${model}`);
+    console.log(`[generateWithGemini] URL: ${apiUrl.replace(apiKey, 'API_KEY_HIDDEN')}`);
+    
     // Gemini usa un formato diferente: combinar system y user prompt
     const fullPrompt = `${systemPrompt}\n\n${userPrompt}`;
     
@@ -322,12 +374,18 @@ async function generateWithGemini(systemPrompt, userPrompt, apiKey, env) {
 
     const data = await response.json();
     
+    console.log(`[generateWithGemini] Response status: ${response.status}`);
+    console.log(`[generateWithGemini] Response data:`, JSON.stringify(data).substring(0, 200));
+    
     if (!response.ok) {
-      throw new Error(data.error?.message || 'Error en la API de Gemini');
+      console.error(`[generateWithGemini] Error API:`, data);
+      throw new Error(data.error?.message || JSON.stringify(data.error || data));
     }
 
     // Extraer el contenido de la respuesta de Gemini
     const content = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+    
+    console.log(`[generateWithGemini] Contenido generado: ${content.substring(0, 100)}...`);
     
     if (!content) {
       throw new Error('Respuesta vacía de Gemini');
@@ -335,12 +393,16 @@ async function generateWithGemini(systemPrompt, userPrompt, apiKey, env) {
     
     // Intentar parsear el JSON de la respuesta
     try {
-      const parsed = JSON.parse(content);
+      // Limpiar posibles marcadores de código
+      const cleanContent = content.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+      const parsed = JSON.parse(cleanContent);
+      console.log(`[generateWithGemini] JSON parseado correctamente`);
       return {
         title: parsed.title || '',
         message: parsed.message || content
       };
     } catch (e) {
+      console.log(`[generateWithGemini] No es JSON válido, usando contenido directo`);
       // Si no es JSON válido, usar el contenido directamente
       return {
         title: '',
@@ -348,7 +410,7 @@ async function generateWithGemini(systemPrompt, userPrompt, apiKey, env) {
       };
     }
   } catch (error) {
-    console.error('Error generando contenido con Gemini:', error);
+    console.error('[generateWithGemini] Error:', error.message);
     throw error;
   }
 }
@@ -844,8 +906,12 @@ export async function handleTestAI(request, env, corsHeaders) {
  */
 export async function handleGenerateAllProjectPosts(projectId, env, corsHeaders) {
   try {
+    console.log(`[handleGenerateAllProjectPosts] Iniciando para proyecto: ${projectId}`);
+    
     // Verificar si hay API key configurada (SOLO desde KV/Panel Web)
     const aiApiKey = await env.FB_PUBLISHER_KV.get('AI_API_KEY');
+    console.log(`[handleGenerateAllProjectPosts] API Key existe: ${!!aiApiKey}`);
+    
     if (!aiApiKey) {
       return new Response(JSON.stringify({ 
         success: false,
@@ -859,6 +925,8 @@ export async function handleGenerateAllProjectPosts(projectId, env, corsHeaders)
     // Obtener el proyecto
     const projectsData = await env.FB_PUBLISHER_KV.get('projects', { type: 'json' }) || { projects: [] };
     const project = projectsData.projects.find(p => p.id === projectId);
+    
+    console.log(`[handleGenerateAllProjectPosts] Proyecto encontrado: ${!!project}`);
     
     if (!project) {
       return new Response(JSON.stringify({ 
@@ -874,8 +942,13 @@ export async function handleGenerateAllProjectPosts(projectId, env, corsHeaders)
     const projectPosts = await env.FB_PUBLISHER_KV.get(`project:${projectId}:posts`, { type: 'json' }) || { posts: [] };
     const existingUrls = new Set(projectPosts.posts.map(p => p.url));
     
+    console.log(`[handleGenerateAllProjectPosts] Posts existentes: ${existingUrls.size}`);
+    console.log(`[handleGenerateAllProjectPosts] URLs del proyecto: ${project.urls?.length || 0}`);
+    
     // Obtener URLs del proyecto que aún no tienen posts
     const urlsToProcess = (project.urls || []).filter(url => !existingUrls.has(url));
+    
+    console.log(`[handleGenerateAllProjectPosts] URLs a procesar: ${urlsToProcess.length}`);
     
     if (urlsToProcess.length === 0) {
       return new Response(JSON.stringify({ 
@@ -894,9 +967,14 @@ export async function handleGenerateAllProjectPosts(projectId, env, corsHeaders)
     const newPosts = [];
     const errors = [];
 
+    console.log(`[handleGenerateAllProjectPosts] Procesando lote de ${urlBatch.length} URLs`);
+
     for (const url of urlBatch) {
       try {
+        console.log(`[handleGenerateAllProjectPosts] Procesando URL: ${url}`);
         const content = await generateContentFromURL(url, `Contenido del sitio ${project.name}`, env);
+        console.log(`[handleGenerateAllProjectPosts] Contenido generado para ${url}`);
+        
         newPosts.push({
           id: generateId(),
           url: url,
@@ -907,6 +985,7 @@ export async function handleGenerateAllProjectPosts(projectId, env, corsHeaders)
           aiGenerated: true
         });
       } catch (error) {
+        console.error(`[handleGenerateAllProjectPosts] Error en URL ${url}:`, error.message);
         errors.push({
           url: url,
           error: error.message
@@ -914,15 +993,21 @@ export async function handleGenerateAllProjectPosts(projectId, env, corsHeaders)
       }
     }
 
+    console.log(`[handleGenerateAllProjectPosts] Posts generados: ${newPosts.length}, Errores: ${errors.length}`);
+
     // Guardar los nuevos posts
     if (newPosts.length > 0) {
       projectPosts.posts.push(...newPosts);
       await env.FB_PUBLISHER_KV.put(`project:${projectId}:posts`, JSON.stringify(projectPosts));
       
+      console.log(`[handleGenerateAllProjectPosts] Posts guardados en KV`);
+      
       // Actualizar estadísticas
       for (let i = 0; i < newPosts.length; i++) {
         await updateProjectStats(projectId, env, 'add');
       }
+      
+      console.log(`[handleGenerateAllProjectPosts] Estadísticas actualizadas`);
     }
 
     return new Response(JSON.stringify({ 
@@ -937,6 +1022,7 @@ export async function handleGenerateAllProjectPosts(projectId, env, corsHeaders)
     });
 
   } catch (error) {
+    console.error('[handleGenerateAllProjectPosts] Error general:', error.message);
     return new Response(JSON.stringify({ 
       success: false,
       error: error.message 
