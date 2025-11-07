@@ -1642,3 +1642,28 @@ window.addEventListener('load', () => {
         window.history.replaceState({}, document.title, window.location.pathname);
     }
 });
+
+/**
+ * Cerrar sesión
+ */
+async function logout() {
+    if (!confirm('¿Estás seguro de que deseas cerrar sesión?')) {
+        return;
+    }
+    
+    try {
+        await fetch('/api/auth/logout', { 
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        });
+        
+        // Redirigir al login
+        window.location.href = '/login';
+    } catch (error) {
+        console.error('Error al cerrar sesión:', error);
+        // Redirigir al login de todas formas
+        window.location.href = '/login';
+    }
+}
