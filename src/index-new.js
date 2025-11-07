@@ -9,6 +9,9 @@ import dashboardHTML from './dashboard.html';
 import dashboardCSS from './dashboard.css';
 import dashboardJS from './dashboard.js';
 import loginHTML from './login.html';
+import accountHTML from './account.html';
+import forgotPasswordHTML from './forgot-password.html';
+import resetPasswordHTML from './reset-password.html';
 
 // Importar handlers
 import {
@@ -45,7 +48,12 @@ import {
   requireAuth,
   handleLogin,
   handleLogout,
-  handleGetCurrentUser
+  handleGetCurrentUser,
+  handleChangePassword,
+  handleRequestPasswordReset,
+  handleResetPassword,
+  handleSaveEmailConfig,
+  handleGetEmailConfig
 } from './auth.js';
 
 export default {
@@ -103,11 +111,46 @@ export default {
         return handleGetCurrentUser(request, env, corsHeaders);
       }
 
+      // API para obtener usuario actual (alias)
+      if (url.pathname === '/api/auth/current-user' && request.method === 'GET') {
+        return handleGetCurrentUser(request, env, corsHeaders);
+      }
+
+      // API para cambiar contraseña
+      if (url.pathname === '/api/auth/change-password' && request.method === 'POST') {
+        return handleChangePassword(request, env, corsHeaders);
+      }
+
+      // Página de recuperación de contraseña
+      if (url.pathname === '/forgot-password') {
+        return new Response(getForgotPasswordHTML(), {
+          headers: { ...corsHeaders, 'Content-Type': 'text/html; charset=utf-8' }
+        });
+      }
+
+      // API para solicitar recuperación de contraseña
+      if (url.pathname === '/api/auth/request-reset' && request.method === 'POST') {
+        return handleRequestPasswordReset(request, env, corsHeaders);
+      }
+
+      // Página de restablecer contraseña
+      if (url.pathname === '/reset-password') {
+        return new Response(getResetPasswordHTML(), {
+          headers: { ...corsHeaders, 'Content-Type': 'text/html; charset=utf-8' }
+        });
+      }
+
+      // API para restablecer contraseña
+      if (url.pathname === '/api/auth/reset-password' && request.method === 'POST') {
+        return handleResetPassword(request, env, corsHeaders);
+      }
+
       // ========== RUTAS PROTEGIDAS ==========
       // Verificar autenticación para todas las rutas del dashboard y APIs (excepto OAuth de Facebook)
       const isProtectedRoute = 
         url.pathname === '/' || 
         url.pathname === '/dashboard' ||
+        url.pathname === '/account' ||
         url.pathname === '/dashboard.css' ||
         url.pathname === '/dashboard.js' ||
         url.pathname.startsWith('/api/projects') ||
@@ -156,6 +199,22 @@ export default {
         return new Response(getDashboardJS(), {
           headers: { ...corsHeaders, 'Content-Type': 'application/javascript; charset=utf-8' }
         });
+      }
+
+      // Página de gestión de cuenta
+      if (url.pathname === '/account') {
+        return new Response(getAccountHTML(), {
+          headers: { ...corsHeaders, 'Content-Type': 'text/html; charset=utf-8' }
+        });
+      }
+
+      // ========== CONFIGURACIÓN DE EMAIL ==========
+      if (url.pathname === '/api/settings/email' && request.method === 'GET') {
+        return handleGetEmailConfig(request, env, corsHeaders);
+      }
+
+      if (url.pathname === '/api/settings/email' && request.method === 'POST') {
+        return handleSaveEmailConfig(request, env, corsHeaders);
       }
 
       // ========== PROYECTOS ==========
@@ -475,3 +534,14 @@ function getLoginHTML() {
   return loginHTML;
 }
 
+function getAccountHTML() {
+  return accountHTML;
+}
+
+function getForgotPasswordHTML() {
+  return forgotPasswordHTML;
+}
+
+function getResetPasswordHTML() {
+  return resetPasswordHTML;
+}

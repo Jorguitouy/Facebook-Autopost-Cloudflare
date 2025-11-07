@@ -351,3 +351,430 @@ export async function createOrUpdateUser(username, password, name, role, env) {
   
   return user;
 }
+
+/**
+ * Cambiar contraseña del usuario autenticado
+ */
+export async function handleChangePassword(request, env, corsHeaders) {
+  try {
+    const user = await requireAuth(request, env);
+    
+    if (!user) {
+      return new Response(JSON.stringify({ 
+        success: false, 
+        error: 'No autenticado' 
+      }), {
+        status: 401,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
+    
+    const { currentPassword, newPassword } = await request.json();
+    
+    if (!currentPassword || !newPassword) {
+      return new Response(JSON.stringify({ 
+        success: false, 
+        error: 'Contraseña actual y nueva requeridas' 
+      }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
+    
+    // Verificar contraseña actual
+    const verifiedUser = await verifyCredentials(user.username, currentPassword, env);
+    
+    if (!verifiedUser) {
+      return new Response(JSON.stringify({ 
+        success: false, 
+        error: 'Contraseña actual incorrecta' 
+      }), {
+        status: 401,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
+    
+    // Actualizar contraseña
+    const usersData = await env.FB_PUBLISHER_KV.get('auth_users', { type: 'json' });
+    const userIndex = usersData.users.findIndex(u => u.username === user.username);
+    
+    if (userIndex === -1) {
+      return new Response(JSON.stringify({ 
+        success: false, 
+        error: 'Usuario no encontrado' 
+      }), {
+        status: 404,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
+    
+    usersData.users[userIndex].passwordHash = await hashPassword(newPassword);
+    usersData.users[userIndex].updatedAt = new Date().toISOString();
+    
+    await env.FB_PUBLISHER_KV.put('auth_users', JSON.stringify(usersData));
+    
+    console.log(`[Auth] Contraseña cambiada: ${user.username}`);
+    
+    return new Response(JSON.stringify({ 
+      success: true,
+      message: 'Contraseña actualizada exitosamente'
+    }), {
+      status: 200,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    });
+  } catch (error) {
+    console.error('[Auth] Error cambiando contraseña:', error);
+    return new Response(JSON.stringify({ 
+      success: false, 
+      error: 'Error en el servidor' 
+    }), {
+      status: 500,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    });
+  }
+}
+
+/**
+ * Genera un token de recuperación de contraseña
+ */
+function generateResetToken() {
+  return crypto.randomUUID();
+}
+
+/**
+ * Envía email de recuperación usando Resend
+ */
+async function sendPasswordResetEmail(email, username, resetToken, env) {
+  try {
+    // Obtener configuración de email
+    const emailConfig = await env.FB_PUBLISHER_KV.get('email_config', { type: 'json' });
+    
+    if (!emailConfig || !emailConfig.resendApiKey) {
+      console.error('[Auth] Resend API Key no configurada');
+      return { success: false, error: 'Servicio de email no configurado' };
+    }
+    
+    const resetUrl = `${env.WORKER_URL || 'https://facebook-auto-publisher.jorguitouy.workers.dev'}/reset-password?token=${resetToken}`;
+    
+    const emailData = {
+      from: emailConfig.fromEmail || 'noreply@example.com',
+      to: email,
+      subject: 'Recuperación de Contraseña - Facebook Auto Publisher',
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+          <h2 style="color: #1877f2;">🔐 Recuperación de Contraseña</h2>
+          <p>Hola <strong>${username}</strong>,</p>
+          <p>Recibimos una solicitud para restablecer tu contraseña.</p>
+          <p>Haz clic en el siguiente botón para crear una nueva contraseña:</p>
+          <div style="text-align: center; margin: 30px 0;">
+            <a href="${resetUrl}" 
+               style="background: #1877f2; color: white; padding: 12px 24px; text-decoration: none; border-radius: 8px; display: inline-block;">
+              Restablecer Contraseña
+            </a>
+          </div>
+          <p>O copia y pega este enlace en tu navegador:</p>
+          <p style="word-break: break-all; color: #666;">${resetUrl}</p>
+          <p><strong>Este enlace expirará en 1 hora.</strong></p>
+          <p>Si no solicitaste este cambio, ignora este email.</p>
+          <hr style="margin: 30px 0; border: none; border-top: 1px solid #e4e6eb;">
+          <p style="color: #666; font-size: 12px;">
+            Este es un email automático, por favor no respondas.
+          </p>
+        </div>
+      `
+    };
+    
+    const response = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${emailConfig.resendApiKey}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(emailData)
+    });
+    
+    if (!response.ok) {
+      const errorData = await response.text();
+      console.error('[Auth] Error enviando email:', errorData);
+      return { success: false, error: 'Error al enviar email' };
+    }
+    
+    console.log(`[Auth] Email de recuperación enviado a: ${email}`);
+    return { success: true };
+  } catch (error) {
+    console.error('[Auth] Error enviando email:', error);
+    return { success: false, error: 'Error al enviar email' };
+  }
+}
+
+/**
+ * Handler para solicitar recuperación de contraseña
+ */
+export async function handleRequestPasswordReset(request, env, corsHeaders) {
+  try {
+    const { username } = await request.json();
+    
+    if (!username) {
+      return new Response(JSON.stringify({ 
+        success: false, 
+        error: 'Usuario requerido' 
+      }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
+    
+    // Obtener usuario
+    const usersData = await env.FB_PUBLISHER_KV.get('auth_users', { type: 'json' });
+    const user = usersData?.users?.find(u => u.username === username);
+    
+    // Por seguridad, siempre respondemos con éxito aunque el usuario no exista
+    if (!user || !user.email) {
+      console.log(`[Auth] Usuario no encontrado o sin email: ${username}`);
+      return new Response(JSON.stringify({ 
+        success: true,
+        message: 'Si el usuario existe y tiene email configurado, recibirás un email de recuperación'
+      }), {
+        status: 200,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
+    
+    // Generar token
+    const resetToken = generateResetToken();
+    const expiresAt = Date.now() + (60 * 60 * 1000); // 1 hora
+    
+    // Guardar token en KV
+    await env.FB_PUBLISHER_KV.put(
+      `reset:${resetToken}`,
+      JSON.stringify({
+        username: user.username,
+        createdAt: new Date().toISOString(),
+        expiresAt
+      }),
+      { expirationTtl: 3600 } // 1 hora
+    );
+    
+    // Enviar email
+    const emailResult = await sendPasswordResetEmail(user.email, user.username, resetToken, env);
+    
+    if (!emailResult.success) {
+      return new Response(JSON.stringify({ 
+        success: false, 
+        error: emailResult.error 
+      }), {
+        status: 500,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
+    
+    return new Response(JSON.stringify({ 
+      success: true,
+      message: 'Email de recuperación enviado exitosamente'
+    }), {
+      status: 200,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    });
+  } catch (error) {
+    console.error('[Auth] Error en solicitud de recuperación:', error);
+    return new Response(JSON.stringify({ 
+      success: false, 
+      error: 'Error en el servidor' 
+    }), {
+      status: 500,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    });
+  }
+}
+
+/**
+ * Handler para restablecer contraseña con token
+ */
+export async function handleResetPassword(request, env, corsHeaders) {
+  try {
+    const { token, newPassword } = await request.json();
+    
+    if (!token || !newPassword) {
+      return new Response(JSON.stringify({ 
+        success: false, 
+        error: 'Token y nueva contraseña requeridos' 
+      }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
+    
+    // Verificar token
+    const resetData = await env.FB_PUBLISHER_KV.get(`reset:${token}`, { type: 'json' });
+    
+    if (!resetData) {
+      return new Response(JSON.stringify({ 
+        success: false, 
+        error: 'Token inválido o expirado' 
+      }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
+    
+    // Verificar expiración
+    if (Date.now() > resetData.expiresAt) {
+      await env.FB_PUBLISHER_KV.delete(`reset:${token}`);
+      return new Response(JSON.stringify({ 
+        success: false, 
+        error: 'Token expirado' 
+      }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
+    
+    // Actualizar contraseña
+    const usersData = await env.FB_PUBLISHER_KV.get('auth_users', { type: 'json' });
+    const userIndex = usersData.users.findIndex(u => u.username === resetData.username);
+    
+    if (userIndex === -1) {
+      return new Response(JSON.stringify({ 
+        success: false, 
+        error: 'Usuario no encontrado' 
+      }), {
+        status: 404,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
+    
+    usersData.users[userIndex].passwordHash = await hashPassword(newPassword);
+    usersData.users[userIndex].updatedAt = new Date().toISOString();
+    
+    await env.FB_PUBLISHER_KV.put('auth_users', JSON.stringify(usersData));
+    
+    // Eliminar token usado
+    await env.FB_PUBLISHER_KV.delete(`reset:${token}`);
+    
+    console.log(`[Auth] Contraseña restablecida: ${resetData.username}`);
+    
+    return new Response(JSON.stringify({ 
+      success: true,
+      message: 'Contraseña restablecida exitosamente'
+    }), {
+      status: 200,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    });
+  } catch (error) {
+    console.error('[Auth] Error restableciendo contraseña:', error);
+    return new Response(JSON.stringify({ 
+      success: false, 
+      error: 'Error en el servidor' 
+    }), {
+      status: 500,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    });
+  }
+}
+
+/**
+ * Guardar configuración de email
+ */
+export async function handleSaveEmailConfig(request, env, corsHeaders) {
+  try {
+    const user = await requireAuth(request, env);
+    
+    if (!user || user.role !== 'admin') {
+      return new Response(JSON.stringify({ 
+        success: false, 
+        error: 'Acceso denegado. Solo administradores.' 
+      }), {
+        status: 403,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
+    
+    const { resendApiKey, fromEmail } = await request.json();
+    
+    if (!fromEmail) {
+      return new Response(JSON.stringify({ 
+        success: false, 
+        error: 'Email remitente requerido' 
+      }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
+    
+    // Obtener configuración existente
+    const existingConfig = await env.FB_PUBLISHER_KV.get('email_config', { type: 'json' }) || {};
+    
+    const config = {
+      fromEmail,
+      updatedAt: new Date().toISOString(),
+      updatedBy: user.username
+    };
+    
+    // Solo actualizar API key si se proporcionó una nueva
+    if (resendApiKey) {
+      config.resendApiKey = resendApiKey;
+    } else if (existingConfig.resendApiKey) {
+      config.resendApiKey = existingConfig.resendApiKey;
+    }
+    
+    await env.FB_PUBLISHER_KV.put('email_config', JSON.stringify(config));
+    
+    console.log(`[Auth] Configuración de email actualizada por: ${user.username}`);
+    
+    return new Response(JSON.stringify({ 
+      success: true,
+      message: 'Configuración guardada exitosamente'
+    }), {
+      status: 200,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    });
+  } catch (error) {
+    console.error('[Auth] Error guardando configuración de email:', error);
+    return new Response(JSON.stringify({ 
+      success: false, 
+      error: 'Error en el servidor' 
+    }), {
+      status: 500,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    });
+  }
+}
+
+/**
+ * Obtener configuración de email (sin exponer API key)
+ */
+export async function handleGetEmailConfig(request, env, corsHeaders) {
+  try {
+    const user = await requireAuth(request, env);
+    
+    if (!user) {
+      return new Response(JSON.stringify({ 
+        success: false, 
+        error: 'No autenticado' 
+      }), {
+        status: 401,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
+    
+    const config = await env.FB_PUBLISHER_KV.get('email_config', { type: 'json' }) || {};
+    
+    return new Response(JSON.stringify({ 
+      success: true,
+      fromEmail: config.fromEmail || '',
+      hasApiKey: !!config.resendApiKey
+    }), {
+      status: 200,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    });
+  } catch (error) {
+    console.error('[Auth] Error obteniendo configuración de email:', error);
+    return new Response(JSON.stringify({ 
+      success: false, 
+      error: 'Error en el servidor' 
+    }), {
+      status: 500,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    });
+  }
+}

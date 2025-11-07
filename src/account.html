@@ -1,0 +1,600 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mi Cuenta - Facebook Auto Publisher</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --primary: #1877f2;
+            --primary-dark: #0c63d4;
+            --danger: #dc3545;
+            --success: #28a745;
+            --warning: #ffc107;
+            --dark: #1c1e21;
+            --gray: #65676b;
+            --light-gray: #e4e6eb;
+            --bg: #f0f2f5;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: var(--bg);
+            color: var(--dark);
+            line-height: 1.6;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .navbar {
+            background: white;
+            padding: 1rem 2rem;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .navbar h1 {
+            color: var(--primary);
+            font-size: 1.5rem;
+        }
+
+        .nav-links {
+            display: flex;
+            gap: 1rem;
+            align-items: center;
+        }
+
+        .nav-links a {
+            color: var(--gray);
+            text-decoration: none;
+            padding: 0.5rem 1rem;
+            border-radius: 8px;
+            transition: all 0.3s;
+        }
+
+        .nav-links a:hover {
+            background: var(--light-gray);
+            color: var(--dark);
+        }
+
+        .container {
+            max-width: 800px;
+            margin: 2rem auto;
+            padding: 0 1rem;
+            flex: 1;
+        }
+
+        .card {
+            background: white;
+            border-radius: 12px;
+            padding: 2rem;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            margin-bottom: 2rem;
+        }
+
+        .card h2 {
+            color: var(--dark);
+            margin-bottom: 1.5rem;
+            padding-bottom: 1rem;
+            border-bottom: 2px solid var(--light-gray);
+        }
+
+        .user-info {
+            display: grid;
+            gap: 1rem;
+            margin-bottom: 2rem;
+        }
+
+        .info-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 1rem;
+            background: var(--bg);
+            border-radius: 8px;
+        }
+
+        .info-item label {
+            font-weight: 600;
+            color: var(--gray);
+        }
+
+        .info-item span {
+            color: var(--dark);
+        }
+
+        .form-group {
+            margin-bottom: 1.5rem;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 0.5rem;
+            font-weight: 600;
+            color: var(--dark);
+        }
+
+        .password-input-wrapper {
+            position: relative;
+        }
+
+        .form-group input {
+            width: 100%;
+            padding: 0.75rem;
+            border: 2px solid var(--light-gray);
+            border-radius: 8px;
+            font-size: 1rem;
+            transition: border-color 0.3s;
+        }
+
+        .form-group input:focus {
+            outline: none;
+            border-color: var(--primary);
+        }
+
+        .toggle-password {
+            position: absolute;
+            right: 12px;
+            top: 50%;
+            transform: translateY(-50%);
+            background: none;
+            border: none;
+            cursor: pointer;
+            font-size: 1.2rem;
+            color: var(--gray);
+            padding: 0.5rem;
+        }
+
+        .btn {
+            padding: 0.75rem 1.5rem;
+            border: none;
+            border-radius: 8px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .btn-primary {
+            background: var(--primary);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: var(--primary-dark);
+        }
+
+        .btn-primary:disabled {
+            background: var(--gray);
+            cursor: not-allowed;
+        }
+
+        .message {
+            padding: 1rem;
+            border-radius: 8px;
+            margin-bottom: 1rem;
+            display: none;
+        }
+
+        .message.show {
+            display: block;
+        }
+
+        .message.success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+
+        .message.error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+
+        .password-requirements {
+            margin-top: 0.5rem;
+            padding: 1rem;
+            background: var(--bg);
+            border-radius: 8px;
+            font-size: 0.9rem;
+        }
+
+        .password-requirements ul {
+            margin-left: 1.5rem;
+            color: var(--gray);
+        }
+
+        .password-requirements li {
+            margin: 0.25rem 0;
+        }
+
+        .password-requirements li.valid {
+            color: var(--success);
+        }
+
+        @media (max-width: 768px) {
+            .navbar {
+                padding: 1rem;
+            }
+
+            .navbar h1 {
+                font-size: 1.2rem;
+            }
+
+            .container {
+                margin: 1rem auto;
+            }
+
+            .card {
+                padding: 1.5rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <nav class="navbar">
+        <h1>📱 Facebook Auto Publisher</h1>
+        <div class="nav-links">
+            <a href="/dashboard">🏠 Dashboard</a>
+            <a href="#" onclick="logout(); return false;">🚪 Cerrar Sesión</a>
+        </div>
+    </nav>
+
+    <div class="container">
+        <div class="card">
+            <h2>👤 Información del Usuario</h2>
+            <div class="user-info">
+                <div class="info-item">
+                    <label>Usuario:</label>
+                    <span id="username">-</span>
+                </div>
+                <div class="info-item">
+                    <label>Nombre:</label>
+                    <span id="name">-</span>
+                </div>
+                <div class="info-item">
+                    <label>Rol:</label>
+                    <span id="role">-</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <h2>� Configuración de Email (Resend)</h2>
+            
+            <div id="emailStatusMessage" class="message"></div>
+
+            <form id="emailConfigForm">
+                <div class="form-group">
+                    <label for="resendApiKey">API Key de Resend</label>
+                    <div class="password-input-wrapper">
+                        <input 
+                            type="password" 
+                            id="resendApiKey" 
+                            name="resendApiKey"
+                            placeholder="re_xxxxxxxxxxxxxxxxxx"
+                            autocomplete="off"
+                        >
+                        <button type="button" class="toggle-password" onclick="togglePassword('resendApiKey')">
+                            👁️
+                        </button>
+                    </div>
+                    <small style="color: var(--gray); display: block; margin-top: 0.5rem;">
+                        📝 Obtén tu API Key en <a href="https://resend.com/api-keys" target="_blank" style="color: var(--primary);">resend.com/api-keys</a>
+                    </small>
+                </div>
+
+                <div class="form-group">
+                    <label for="fromEmail">Email Remitente</label>
+                    <input 
+                        type="email" 
+                        id="fromEmail" 
+                        name="fromEmail"
+                        placeholder="noreply@tudominio.com"
+                        required
+                    >
+                    <small style="color: var(--gray); display: block; margin-top: 0.5rem;">
+                        📧 Debe ser un dominio verificado en Resend
+                    </small>
+                </div>
+
+                <button type="submit" class="btn btn-primary" id="emailSubmitBtn">
+                    Guardar Configuración de Email
+                </button>
+            </form>
+        </div>
+
+        <div class="card">
+            <h2>�🔐 Cambiar Contraseña</h2>
+            
+            <div id="statusMessage" class="message"></div>
+
+            <form id="changePasswordForm">
+                <div class="form-group">
+                    <label for="currentPassword">Contraseña Actual</label>
+                    <div class="password-input-wrapper">
+                        <input 
+                            type="password" 
+                            id="currentPassword" 
+                            name="currentPassword"
+                            required
+                            autocomplete="current-password"
+                        >
+                        <button type="button" class="toggle-password" onclick="togglePassword('currentPassword')">
+                            👁️
+                        </button>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="newPassword">Nueva Contraseña</label>
+                    <div class="password-input-wrapper">
+                        <input 
+                            type="password" 
+                            id="newPassword" 
+                            name="newPassword"
+                            required
+                            autocomplete="new-password"
+                            oninput="validatePassword()"
+                        >
+                        <button type="button" class="toggle-password" onclick="togglePassword('newPassword')">
+                            👁️
+                        </button>
+                    </div>
+                    <div class="password-requirements">
+                        <strong>La contraseña debe cumplir:</strong>
+                        <ul>
+                            <li id="req-length">Mínimo 8 caracteres</li>
+                            <li id="req-uppercase">Al menos una mayúscula</li>
+                            <li id="req-lowercase">Al menos una minúscula</li>
+                            <li id="req-number">Al menos un número</li>
+                        </ul>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="confirmPassword">Confirmar Nueva Contraseña</label>
+                    <div class="password-input-wrapper">
+                        <input 
+                            type="password" 
+                            id="confirmPassword" 
+                            name="confirmPassword"
+                            required
+                            autocomplete="new-password"
+                            oninput="validatePassword()"
+                        >
+                        <button type="button" class="toggle-password" onclick="togglePassword('confirmPassword')">
+                            👁️
+                        </button>
+                    </div>
+                </div>
+
+                <button type="submit" class="btn btn-primary" id="submitBtn">
+                    Cambiar Contraseña
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        // Cargar información del usuario
+        async function loadUserInfo() {
+            try {
+                const response = await fetch('/api/auth/current-user');
+                if (response.ok) {
+                    const data = await response.json();
+                    document.getElementById('username').textContent = data.user.username;
+                    document.getElementById('name').textContent = data.user.name;
+                    document.getElementById('role').textContent = data.user.role === 'admin' ? 'Administrador' : 'Editor';
+                } else {
+                    window.location.href = '/login';
+                }
+            } catch (error) {
+                console.error('Error al cargar usuario:', error);
+                window.location.href = '/login';
+            }
+        }
+
+        // Cargar configuración de email
+        async function loadEmailConfig() {
+            try {
+                const response = await fetch('/api/settings/email');
+                if (response.ok) {
+                    const data = await response.json();
+                    if (data.fromEmail) {
+                        document.getElementById('fromEmail').value = data.fromEmail;
+                    }
+                    if (data.hasApiKey) {
+                        document.getElementById('resendApiKey').placeholder = '••••••••••••••••••••';
+                    }
+                }
+            } catch (error) {
+                console.error('Error al cargar configuración de email:', error);
+            }
+        }
+
+        // Alternar visibilidad de contraseña
+        function togglePassword(fieldId) {
+            const field = document.getElementById(fieldId);
+            field.type = field.type === 'password' ? 'text' : 'password';
+        }
+
+        // Validar contraseña
+        function validatePassword() {
+            const password = document.getElementById('newPassword').value;
+            const confirm = document.getElementById('confirmPassword').value;
+            const submitBtn = document.getElementById('submitBtn');
+
+            // Requisitos
+            const hasLength = password.length >= 8;
+            const hasUppercase = /[A-Z]/.test(password);
+            const hasLowercase = /[a-z]/.test(password);
+            const hasNumber = /\d/.test(password);
+            const passwordsMatch = password === confirm && password.length > 0;
+
+            // Actualizar UI de requisitos
+            document.getElementById('req-length').className = hasLength ? 'valid' : '';
+            document.getElementById('req-uppercase').className = hasUppercase ? 'valid' : '';
+            document.getElementById('req-lowercase').className = hasLowercase ? 'valid' : '';
+            document.getElementById('req-number').className = hasNumber ? 'valid' : '';
+
+            // Habilitar/deshabilitar botón
+            const allValid = hasLength && hasUppercase && hasLowercase && hasNumber && passwordsMatch;
+            submitBtn.disabled = !allValid;
+
+            return allValid;
+        }
+
+        // Manejar envío del formulario
+        document.getElementById('changePasswordForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const statusMessage = document.getElementById('statusMessage');
+            const submitBtn = document.getElementById('submitBtn');
+
+            const currentPassword = document.getElementById('currentPassword').value;
+            const newPassword = document.getElementById('newPassword').value;
+            const confirmPassword = document.getElementById('confirmPassword').value;
+
+            // Validar que las contraseñas coincidan
+            if (newPassword !== confirmPassword) {
+                statusMessage.textContent = '❌ Las contraseñas no coinciden';
+                statusMessage.className = 'message error show';
+                return;
+            }
+
+            // Validar requisitos de contraseña
+            if (!validatePassword()) {
+                statusMessage.textContent = '❌ La contraseña no cumple con los requisitos';
+                statusMessage.className = 'message error show';
+                return;
+            }
+
+            submitBtn.disabled = true;
+            statusMessage.textContent = '⏳ Cambiando contraseña...';
+            statusMessage.className = 'message show';
+
+            try {
+                const response = await fetch('/api/auth/change-password', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        currentPassword,
+                        newPassword
+                    })
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    statusMessage.textContent = '✅ Contraseña cambiada exitosamente';
+                    statusMessage.className = 'message success show';
+                    
+                    // Limpiar formulario
+                    document.getElementById('changePasswordForm').reset();
+                    
+                    // Redirigir al dashboard después de 2 segundos
+                    setTimeout(() => {
+                        window.location.href = '/dashboard';
+                    }, 2000);
+                } else {
+                    statusMessage.textContent = `❌ ${data.error || 'Error al cambiar contraseña'}`;
+                    statusMessage.className = 'message error show';
+                    submitBtn.disabled = false;
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                statusMessage.textContent = '❌ Error de conexión';
+                statusMessage.className = 'message error show';
+                submitBtn.disabled = false;
+            }
+        });
+
+        // Manejar configuración de email
+        document.getElementById('emailConfigForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const emailStatusMessage = document.getElementById('emailStatusMessage');
+            const emailSubmitBtn = document.getElementById('emailSubmitBtn');
+
+            const resendApiKey = document.getElementById('resendApiKey').value.trim();
+            const fromEmail = document.getElementById('fromEmail').value.trim();
+
+            if (!fromEmail) {
+                emailStatusMessage.textContent = '❌ El email remitente es requerido';
+                emailStatusMessage.className = 'message error show';
+                return;
+            }
+
+            emailSubmitBtn.disabled = true;
+            emailStatusMessage.textContent = '⏳ Guardando configuración...';
+            emailStatusMessage.className = 'message show';
+
+            try {
+                const body = { fromEmail };
+                
+                // Solo incluir API key si se ingresó una nueva
+                if (resendApiKey) {
+                    body.resendApiKey = resendApiKey;
+                }
+
+                const response = await fetch('/api/settings/email', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(body)
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    emailStatusMessage.textContent = '✅ Configuración guardada exitosamente';
+                    emailStatusMessage.className = 'message success show';
+                    
+                    // Limpiar campo de API key y actualizar placeholder
+                    document.getElementById('resendApiKey').value = '';
+                    document.getElementById('resendApiKey').placeholder = '••••••••••••••••••••';
+                    
+                    emailSubmitBtn.disabled = false;
+                } else {
+                    emailStatusMessage.textContent = `❌ ${data.error || 'Error al guardar configuración'}`;
+                    emailStatusMessage.className = 'message error show';
+                    emailSubmitBtn.disabled = false;
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                emailStatusMessage.textContent = '❌ Error de conexión';
+                emailStatusMessage.className = 'message error show';
+                emailSubmitBtn.disabled = false;
+            }
+        });
+
+        // Cerrar sesión
+        async function logout() {
+            try {
+                await fetch('/api/auth/logout', { method: 'POST' });
+                window.location.href = '/login';
+            } catch (error) {
+                console.error('Error al cerrar sesión:', error);
+                window.location.href = '/login';
+            }
+        }
+
+        // Cargar información al iniciar
+        loadUserInfo();
+        loadEmailConfig();
+    </script>
+</body>
+</html>

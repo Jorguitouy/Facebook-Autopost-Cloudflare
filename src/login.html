@@ -173,6 +173,23 @@
             font-size: 12px;
         }
 
+        .forgot-password {
+            text-align: center;
+            margin-top: 15px;
+        }
+
+        .forgot-password a {
+            color: #667eea;
+            text-decoration: none;
+            font-size: 14px;
+            transition: color 0.3s;
+        }
+
+        .forgot-password a:hover {
+            color: #764ba2;
+            text-decoration: underline;
+        }
+
         .password-toggle {
             position: relative;
         }
@@ -240,6 +257,10 @@
                 Iniciar Sesión
             </button>
         </form>
+
+        <div class="forgot-password">
+            <a href="/forgot-password">¿Olvidaste tu contraseña?</a>
+        </div>
 
         <div class="loading" id="loading">
             <div class="spinner"></div>
